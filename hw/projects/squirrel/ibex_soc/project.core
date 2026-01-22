@@ -1,0 +1,74 @@
+CAPI=2:
+name: mono:projects:squirrel_ibex_soc:0.1.0
+description: Ibex RISC-V SoC for Squirrel/CaptainDMA board
+
+filesets:
+  rtl:
+    files:
+      - rtl/squirrel_ibex_top.sv
+    file_type: systemVerilogSource
+    depend:
+      - mono:ip:ibex_soc
+      - mono:ip:ft601
+
+  board:
+    depend:
+      - mono:boards:squirrel
+
+  constraints:
+    depend:
+      - mono:utils:generators
+    files:
+      - pins.yaml: { copyto: pins.yaml }
+    file_type: user
+
+generate:
+  xdc:
+    generator: xdc_generator
+    parameters:
+      board: board.yaml
+      toplevel: rtl/squirrel_ibex_top.sv
+      output: squirrel_ibex.xdc
+      # Pin mapping is read from pins.yaml by the generator
+      # if more complex mapping is needed
+
+targets:
+  default:
+    filesets: [rtl, board]
+    toplevel: squirrel_ibex_top
+
+  synth: &synth
+    default_tool: vivado
+    filesets: [rtl, board, constraints]
+    generate: [xdc]
+    toplevel: squirrel_ibex_top
+    tools:
+      vivado:
+        part: xc7a35tfgg484-2
+
+  impl:
+    <<: *synth
+    tools:
+      vivado:
+        part: xc7a35tfgg484-2
+        pnr: vivado
+
+  lint:
+    default_tool: verilator
+    filesets: [rtl]
+    toplevel: squirrel_ibex_top
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+
+  sim:
+    default_tool: verilator
+    filesets: [rtl]
+    toplevel: squirrel_ibex_top
+    tools:
+      verilator:
+        verilator_options:
+          - --trace
+          - --trace-fst

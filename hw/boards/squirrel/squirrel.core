@@ -1,0 +1,13 @@
+CAPI=2:
+name: mono:boards:squirrel:0.1.0
+description: Squirrel / CaptainDMA 4.1th board support (XC7A35T-FGG484)
+
+filesets:
+  board:
+    files:
+      - board.yaml: { copyto: board.yaml }
+    file_type: user
+
+targets:
+  default:
+    filesets: [board]

@@ -1,0 +1,36 @@
+CAPI=2:
+name: mono:ip:wb_crossbar:0.1.0
+description: Wishbone B4 pipelined crossbar interconnect
+
+filesets:
+  rtl:
+    files:
+      - rtl/wb_pkg.sv
+      - rtl/wb_arbiter.sv
+      - rtl/wb_decoder.sv
+      - rtl/wb_crossbar.sv
+    file_type: systemVerilogSource
+
+targets:
+  default: &default
+    filesets: [rtl]
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+          - --top-module wb_crossbar
+
+  sim:
+    <<: *default
+    default_tool: verilator
+    tools:
+      verilator:
+        verilator_options:
+          - --trace
+          - --trace-fst
+          - --top-module wb_crossbar

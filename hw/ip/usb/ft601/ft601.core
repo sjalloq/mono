@@ -1,0 +1,23 @@
+CAPI=2:
+name: mono:ip:ft601:0.1.0
+description: FT601 USB 3.0 Synchronous FIFO PHY
+
+filesets:
+  rtl:
+    files:
+      - rtl/ft601_sync.sv
+    file_type: systemVerilogSource
+
+targets:
+  default: &default
+    filesets: [rtl]
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    toplevel: ft601_sync
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall

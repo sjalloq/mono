@@ -1,0 +1,25 @@
+# Squirrel Ibex SoC Pin Mapping
+#
+# Maps SystemVerilog toplevel port names to board.yaml pin definitions.
+# Used by xdc_generator to create constraints.
+
+# Clock
+clk100: clk100
+
+# User LEDs
+user_led: user_led
+
+# User switches
+user_sw: user_sw
+
+# USB FIFO interface
+usb_fifo_clk: usb_fifo.clk
+usb_fifo_data: usb_fifo.data
+usb_fifo_be: usb_fifo.be
+usb_fifo_rxf_n: usb_fifo.rxf_n
+usb_fifo_txe_n: usb_fifo.txe_n
+usb_fifo_rd_n: usb_fifo.rd_n
+usb_fifo_wr_n: usb_fifo.wr_n
+usb_fifo_oe_n: usb_fifo.oe_n
+usb_fifo_siwu_n: usb_fifo.siwu_n
+usb_fifo_rst_n: usb_fifo.rst_n

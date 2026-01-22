@@ -1,0 +1,50 @@
+CAPI=2:
+name: mono:ip:ibex_wb:0.1.0
+description: Ibex RISC-V core with Wishbone pipelined interface
+
+filesets:
+  rtl:
+    files:
+      - rtl/ibex_obi2wb.sv
+      - rtl/ibex_wb_top.sv
+    file_type: systemVerilogSource
+    depend:
+      - lowrisc:ibex:ibex_top
+
+  # Force generic primitives for simulation/linting (no Xilinx primitives)
+  prim_generic:
+    depend:
+      - lowrisc:prim_generic:clock_gating
+      - lowrisc:prim_generic:clock_mux2
+
+targets:
+  default: &default
+    filesets:
+      - "target_lint ? (prim_generic)"
+      - "target_sim ? (prim_generic)"
+      - rtl
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    toplevel: ibex_wb_top
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+          # Suppress known Ibex warnings that are benign
+          - -Wno-UNUSEDSIGNAL
+          - -Wno-UNOPTFLAT
+          - -Wno-WIDTH
+          - -Wno-CASEINCOMPLETE
+
+  sim:
+    <<: *default
+    default_tool: verilator
+    toplevel: ibex_wb_top
+    tools:
+      verilator:
+        verilator_options:
+          - --trace
+          - --trace-fst

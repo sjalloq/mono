@@ -1,9 +1,14 @@
 CAPI=2:
 name: mono:utils:generators:0.1.0
-description: FuseSoC generators for Migen netlist generation
+description: FuseSoC generators for Migen netlist and XDC constraint generation
 
 generators:
   migen_netlister:
     interpreter: python3
     command: migen_netlister.py
     description: Convert Migen/LiteX modules to Verilog netlists
+
+  xdc_generator:
+    interpreter: python3
+    command: xdc_generator.py
+    description: Generate XDC constraints from board YAML and SV ports

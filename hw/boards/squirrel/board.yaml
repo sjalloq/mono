@@ -1,0 +1,175 @@
+# Squirrel / CaptainDMA 4.1th Board Definition
+#
+# Pin-compatible boards using XC7A35T-FGG484.
+# Constraints derived from pcileech-fpga XDC files.
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+device: xc7a35tfgg484-2
+
+clocks:
+  clk100:
+    pin: H4
+    frequency: 100e6
+    iostandard: LVCMOS33
+
+pins:
+  # User LEDs
+  user_led:
+    - { pin: Y6, iostandard: LVCMOS33 }
+    - { pin: AB5, iostandard: LVCMOS33 }
+
+  # User Switches
+  user_sw:
+    - { pin: AB3, iostandard: LVCMOS33 }
+    - { pin: AA5, iostandard: LVCMOS33 }
+
+  # FT2232 Reset
+  ft2232_rst_n:
+    pin: F21
+    iostandard: LVCMOS33
+
+  # PCIe x1
+  pcie_x1:
+    rst_n:
+      pin: B13
+      iostandard: LVCMOS33
+      pullup: true
+    clk_p:
+      pin: F6
+      iostandard: DIFF_SSTL15
+    clk_n:
+      pin: E6
+      iostandard: DIFF_SSTL15
+    rx_p:
+      pin: B10
+      iostandard: DIFF_SSTL15
+    rx_n:
+      pin: A10
+      iostandard: DIFF_SSTL15
+    tx_p:
+      pin: B6
+      iostandard: DIFF_SSTL15
+    tx_n:
+      pin: A6
+      iostandard: DIFF_SSTL15
+
+  # PCIe auxiliary signals
+  pcie_present:
+    pin: A13
+    iostandard: LVCMOS33
+
+  pcie_wake_n:
+    pin: A14
+    iostandard: LVCMOS33
+
+  # FT601 USB 3.0 FIFO
+  usb_fifo:
+    # Clock from FT601 (100 MHz)
+    clk:
+      pin: W19
+      iostandard: LVCMOS33
+
+    # 32-bit bidirectional data bus
+    data:
+      pins:
+        - N13    # D[0]
+        - N14    # D[1]
+        - N15    # D[2]
+        - P15    # D[3]
+        - P16    # D[4]
+        - N17    # D[5]
+        - P17    # D[6]
+        - R17    # D[7]
+        - P19    # D[8]
+        - R18    # D[9]
+        - R19    # D[10]
+        - T18    # D[11]
+        - U18    # D[12]
+        - V18    # D[13]
+        - V19    # D[14]
+        - V17    # D[15]
+        - W20    # D[16]
+        - Y19    # D[17]
+        - T21    # D[18]
+        - T20    # D[19]
+        - U21    # D[20]
+        - V20    # D[21]
+        - W22    # D[22]
+        - W21    # D[23]
+        - Y22    # D[24]
+        - Y21    # D[25]
+        - AA21   # D[26]
+        - AB22   # D[27]
+        - AA20   # D[28]
+        - AB21   # D[29]
+        - AA19   # D[30]
+        - AB20   # D[31]
+      iostandard: LVCMOS33
+      slew: FAST
+
+    # Byte enables
+    be:
+      pins: [Y18, AA18, AB18, W17]
+      iostandard: LVCMOS33
+      slew: FAST
+
+    # Control signals
+    rxf_n:
+      pin: AB8
+      iostandard: LVCMOS33
+
+    txe_n:
+      pin: AA8
+      iostandard: LVCMOS33
+
+    rd_n:
+      pin: AA6
+      iostandard: LVCMOS33
+      slew: FAST
+
+    wr_n:
+      pin: AB7
+      iostandard: LVCMOS33
+      slew: FAST
+
+    oe_n:
+      pin: AB6
+      iostandard: LVCMOS33
+      slew: FAST
+
+    siwu_n:
+      pin: Y8
+      iostandard: LVCMOS33
+      slew: FAST
+
+    rst_n:
+      pin: Y9
+      iostandard: LVCMOS33
+      slew: FAST
+
+# Timing constraints for USB FIFO interface
+timing:
+  usb_fifo:
+    clk: usb_fifo.clk
+    input_delay:
+      min: 6.5
+      max: 7.0
+      ports: [data, rxf_n, txe_n]
+    output_delay:
+      min: 4.8
+      max: 1.0
+      ports: [data, be, rd_n, wr_n, oe_n]
+
+  false_paths:
+    - { from: clk100, to: usb_fifo.clk }
+    - { from: usb_fifo.clk, to: clk100 }
+
+# Bitstream configuration settings
+bitstream:
+  CFGBVS: Vcco
+  CONFIG_VOLTAGE: "3.3"
+  BITSTREAM.CONFIG.SPI_BUSWIDTH: "4"
+  BITSTREAM.GENERAL.COMPRESS: "TRUE"
+  BITSTREAM.CONFIG.SPI_FALL_EDGE: "YES"
+  BITSTREAM.CONFIG.CONFIGRATE: "66"

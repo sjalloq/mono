@@ -15,11 +15,6 @@ docs/_build/
 build/
 *.eda.yml
 
-# Generated HDL
-*.v
-*.sv
-!*.hand.sv
-
 # Simulation
 *.vcd
 *.fst

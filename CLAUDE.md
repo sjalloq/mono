@@ -11,7 +11,7 @@ make docs                 # Build Sphinx documentation
 ## Directory Structure
 
 - `docs/source/` - Sphinx functional specification
-- `docs/guides/` - Markdown guides (testbenches, tools)
+- `docs/guides/` - Markdown guides (testbenches, tools, coding standards)
 - `docs/plans/` - Implementation plans and tasks
 
 ## Key Docs

@@ -1,0 +1,31 @@
+CAPI=2:
+name: mono:ip:timer:0.1.0
+description: RISC-V timer (mtime/mtimecmp) with Wishbone interface
+
+filesets:
+  rtl:
+    files:
+      - rtl/wb_timer.sv
+    file_type: systemVerilogSource
+
+targets:
+  default: &default
+    filesets: [rtl]
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+
+  sim:
+    <<: *default
+    default_tool: verilator
+    tools:
+      verilator:
+        verilator_options:
+          - --trace
+          - --trace-fst

@@ -1,0 +1,27 @@
+CAPI=2:
+name: mono:ip:usb_etherbone:0.1.0
+description: USB Etherbone - Wishbone master over USB using Etherbone protocol
+
+generate:
+  netlist:
+    generator: migen_netlister
+    parameters:
+      module: mono.gateware.wrappers.usb_etherbone
+      class: USBEtherboneWrapper
+      name: usb_etherbone
+      args:
+        clk_freq: 100000000
+        timeout: 10
+        etherbone_channel: 0
+        buffer_depth: 4
+
+filesets:
+  rtl:
+    depend:
+      - mono:utils:generators
+    files: []
+
+targets:
+  default:
+    filesets: [rtl]
+    generate: [netlist]
