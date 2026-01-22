@@ -1,0 +1,45 @@
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Sphinx documentation
+docs/_build/
+
+# Fusesoc
+build/
+*.eda.yml
+
+# Generated HDL
+*.v
+*.sv
+!*.hand.sv
+
+# Simulation
+*.vcd
+*.fst
+*.lxt
+*.lxt2
+
+# FPGA build artifacts
+*.bit
+*.bin
+*.svf
+*.jic
+*.rbf
+*.sof
+
+# Editor
+*~
+*.swp
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

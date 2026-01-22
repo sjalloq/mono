@@ -1,0 +1,5 @@
+CAPI=2:
+name: mono:ip:generator
+description: FuseSoC generators
+
+generators:

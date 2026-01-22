@@ -1,0 +1,55 @@
+#!/bin/bash
+
+VENV_DIR=".venv"
+
+usage() {
+    echo "Usage: source sourceme [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -c, --clean    Remove the virtual environment"
+    echo "  -h, --help     Show this help message"
+}
+
+# Parse long options by converting them to short options
+for arg in "$@"; do
+    shift
+    case "$arg" in
+        --clean) set -- "$@" "-c" ;;
+        --help)  set -- "$@" "-h" ;;
+        *)       set -- "$@" "$arg" ;;
+    esac
+done
+
+CLEAN=false
+
+while getopts "ch" opt; do
+    case $opt in
+        c)
+            CLEAN=true
+            ;;
+        h)
+            usage
+            return 0 2>/dev/null || exit 0
+            ;;
+        *)
+            usage
+            return 1 2>/dev/null || exit 1
+            ;;
+    esac
+done
+
+if $CLEAN && [ -d "$VENV_DIR" ]; then
+    echo "Removing virtual environment..."
+    rm -rf "$VENV_DIR"
+fi
+
+if [ -d "$VENV_DIR" ]; then
+    echo "Virtual environment already exists, activating..."
+else
+    echo "Creating virtual environment with uv..."
+    uv venv "$VENV_DIR"
+    echo "Installing dependencies..."
+    uv pip install fusesoc
+fi
+
+source "$VENV_DIR/bin/activate"

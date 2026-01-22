@@ -1,0 +1,27 @@
+[project]
+name = "mono"
+version = "0.1.0"
+description = ""
+requires-python = ">=3.8"
+dependencies = [
+    "fusesoc",
+    "migen @ git+https://github.com/m-labs/migen.git@4c2ae8dfeea37f235b52acb8166f12acaaae4f7c",
+    "litex @ git+https://github.com/enjoy-digital/litex.git@2025.08",
+    "litepcie @ git+https://github.com/sjalloq/litepcie.git@feature/tlp-attributes",
+    "rich-click>=1.7",
+    "pre-commit",
+    "cocotb>=2.0",
+    "cocotb-test",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
