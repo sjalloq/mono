@@ -1,5 +1,9 @@
 CAPI=2:
-name: mono:ip:generator
-description: FuseSoC generators
+name: mono:utils:generators:0.1.0
+description: FuseSoC generators for Migen netlist generation
 
 generators:
+  migen_netlister:
+    interpreter: python3
+    command: migen_netlister.py
+    description: Convert Migen/LiteX modules to Verilog netlists

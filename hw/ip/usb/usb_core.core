@@ -1,0 +1,25 @@
+CAPI=2:
+name: mono:ip:usb_core:0.1.0
+description: USB channel multiplexer (Packetizer + Depacketizer + Crossbar)
+
+filesets:
+  rtl:
+    depend:
+      - mono:utils:generators
+
+generate:
+  netlist:
+    generator: migen_netlister
+    parameters:
+      module: mono.gateware.wrappers.usb_core
+      class: USBCoreWrapper
+      name: usb_core
+      args:
+        num_ports: 2
+        clk_freq: 100000000
+
+targets:
+  default:
+    generate: [netlist]
+    filesets: [rtl]
+    toplevel: usb_core

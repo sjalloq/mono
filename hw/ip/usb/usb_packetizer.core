@@ -1,0 +1,22 @@
+CAPI=2:
+name: mono:ip:usb_packetizer:0.1.0
+description: USB Packetizer - wraps channel data into USB packets with header
+
+filesets:
+  rtl:
+    depend:
+      - mono:utils:generators
+
+generate:
+  netlist:
+    generator: migen_netlister
+    parameters:
+      module: mono.gateware.wrappers.usb_packetizer
+      class: USBPacketizerWrapper
+      name: usb_packetizer
+
+targets:
+  default:
+    generate: [netlist]
+    filesets: [rtl]
+    toplevel: usb_packetizer

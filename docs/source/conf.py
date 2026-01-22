@@ -1,6 +1,6 @@
 # Configuration file for the Sphinx documentation builder.
 
-project = 'USB Etherbone Bridge'
+project = 'Mono'
 copyright = '2026'
 author = 'Shareef Jalloq'
 
