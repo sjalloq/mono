@@ -1,0 +1,116 @@
+[*]
+[*] GTKWave Analyzer v3.3.126 (w)1999-2026 BSI
+[*] Sat Jan 24 13:08:32 2026
+[*]
+[dumpfile] "/home/sjalloq/Work/mono/hw/ip/bus/wb_crossbar/dv/dump.fst"
+[dumpfile_mtime] "Sat Jan 24 09:52:16 2026"
+[dumpfile_size] 24680
+[savefile] "/home/sjalloq/Work/mono/hw/ip/bus/wb_crossbar/dv/waves.gtkw"
+[timestart] 0
+[size] 2053 1475
+[pos] -1 -1
+*-17.172132 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] wb_crossbar_tb.
+[treeopen] wb_crossbar_tb.u_dut.
+[treeopen] wb_crossbar_tb.u_dut.gen_arbiters[0].
+[treeopen] wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.
+[sst_width] 290
+[signals_width] 290
+[sst_expanded] 1
+[sst_vpaned_height] 457
+@100000028
+$rootio.clk_i
+@800200
+-M0
+@28
+$rootio.m0_cyc_i
+$rootio.m0_stb_i
+$rootio.m0_we_i
+@22
+$rootio.m0_sel_i[3:0]
+$rootio.m0_adr_i[31:0]
+@28
+$rootio.m0_stall_o
+@22
+$rootio.m0_dat_i[31:0]
+@23
+$rootio.m0_dat_o[31:0]
+@28
+$rootio.m0_err_o
+$rootio.m0_ack_o
+@1000200
+-M0
+@800200
+-M1
+@28
+$rootio.m1_ack_o
+@22
+$rootio.m1_adr_i[31:0]
+@28
+$rootio.m1_cyc_i
+@22
+$rootio.m1_dat_i[31:0]
+$rootio.m1_dat_o[31:0]
+@28
+$rootio.m1_err_o
+@22
+$rootio.m1_sel_i[3:0]
+@28
+$rootio.m1_stall_o
+$rootio.m1_stb_i
+$rootio.m1_we_i
+@1000200
+-M1
+@800200
+-S0
+@28
+$rootio.s0_ack_i
+@22
+$rootio.s0_adr_o[31:0]
+@28
+$rootio.s0_cyc_o
+@22
+$rootio.s0_dat_i[31:0]
+$rootio.s0_dat_o[31:0]
+@28
+$rootio.s0_err_i
+@22
+$rootio.s0_sel_o[3:0]
+@28
+$rootio.s0_stall_i
+$rootio.s0_stb_o
+$rootio.s0_we_o
+@1000200
+-S0
+@800200
+-S1
+@28
+$rootio.s1_cyc_o
+$rootio.s1_stb_o
+$rootio.s1_we_o
+@22
+$rootio.s1_sel_o[3:0]
+$rootio.s1_adr_o[31:0]
+$rootio.s1_dat_o[31:0]
+$rootio.s1_dat_i[31:0]
+@28
+$rootio.s1_ack_i
+$rootio.s1_err_i
+$rootio.s1_stall_i
+@1000200
+-S1
+@28
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.can_accept
+@100000028
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.state_q
+@28
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.winner_idx[0]
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.winner_oh[1:0]
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.winner_valid
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.ack_i
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.stb_o
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.cyc_o
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.stall_i
+wb_crossbar_tb.u_dut.gen_arbiters[0].u_arbiter.active_master_q[1:0]
+[pattern_trace] 1
+[pattern_trace] 0

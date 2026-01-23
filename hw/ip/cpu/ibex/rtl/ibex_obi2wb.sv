@@ -49,7 +49,7 @@ module ibex_obi2wb #(
 
     // Wishbone signals
     assign wb_cyc_o = obi_req_i || outstanding_q;
-    assign wb_stb_o = obi_req_i && !wb_stall_i;
+    assign wb_stb_o = obi_req_i;
     assign wb_we_o  = obi_we_i;
     assign wb_adr_o = obi_addr_i;
     assign wb_sel_o = obi_be_i;

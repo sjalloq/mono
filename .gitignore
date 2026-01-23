@@ -38,3 +38,7 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Cocotb
+sim_build
+results.xml
