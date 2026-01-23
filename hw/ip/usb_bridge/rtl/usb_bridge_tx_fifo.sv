@@ -88,7 +88,6 @@ module usb_bridge_tx_fifo #(
     // Flush trigger detection
     logic timeout_trigger;
     logic thresh_trigger;
-    logic char_trigger;
     logic any_flush_trigger;
 
     // Timeout: fire when counter reaches threshold and FIFO not empty

@@ -116,10 +116,6 @@ module usb_wishbone_bridge
     logic [15:0]      tx_watermark;
     logic [15:0]      rx_watermark;
 
-    // Overflow sticky bits
-    logic             tx_overflow_sticky_q, tx_overflow_sticky_d;
-    logic             rx_overflow_sticky_q, rx_overflow_sticky_d;
-
     // =========================================================================
     // Wishbone to Simple Bus Adapter
     // =========================================================================
@@ -321,6 +317,7 @@ module usb_wishbone_bridge
     // =========================================================================
 
     logic unused;
-    assign unused = &{usb_rx_last_i, rx_fifo_rd_valid};
+    assign unused = &{usb_rx_last_i, rx_fifo_rd_valid, tx_fifo_wr_ready,
+                      tx_fifo_flushing};
 
 endmodule

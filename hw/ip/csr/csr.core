@@ -11,6 +11,7 @@ filesets:
       - rtl/rdl_subreg.sv
       - rtl/rdl_subreg_ext.sv
       - rtl/wb2simple.sv
+      - target_lint ? (lint/verilator.vlt): {file_type: vlt}
     file_type: systemVerilogSource
 
 targets:

@@ -10,6 +10,7 @@ filesets:
       - rtl/usb_bridge_tx_fifo.sv
       - rtl/usb_bridge_rx_fifo.sv
       - rtl/usb_wishbone_bridge.sv
+      - target_lint ? (lint/verilator.vlt): {file_type: vlt}
     file_type: systemVerilogSource
     depend:
       - mono:ip:csr
@@ -27,8 +28,6 @@ targets:
         mode: lint-only
         verilator_options:
           - -Wall
-          - -Wno-PINCONNECTEMPTY
-          - -Wno-UNUSEDSIGNAL
           - --top-module usb_wishbone_bridge
 
   sim:

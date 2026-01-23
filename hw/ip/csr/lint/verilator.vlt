@@ -1,0 +1,4 @@
+`verilator_config
+
+// rdl_subreg_arb.sv: 'q' input unused in some OnWrite configurations
+lint_off -rule UNUSEDSIGNAL -file "*/rdl_subreg_arb.sv"
