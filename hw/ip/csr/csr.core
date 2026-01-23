@@ -1,0 +1,27 @@
+CAPI=2:
+name: mono:ip:csr:0.1.0
+description: CSR infrastructure for PeakRDL-sv generated register blocks
+
+filesets:
+  rtl:
+    files:
+      - rtl/rdl_subreg_pkg.sv
+      - rtl/rdl_subreg_arb.sv
+      - rtl/rdl_subreg_flop.sv
+      - rtl/rdl_subreg.sv
+      - rtl/rdl_subreg_ext.sv
+      - rtl/wb2simple.sv
+    file_type: systemVerilogSource
+
+targets:
+  default: &default
+    filesets: [rtl]
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall

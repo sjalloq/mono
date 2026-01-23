@@ -1,0 +1,42 @@
+CAPI=2:
+name: mono:ip:usb_bridge:0.1.0
+description: USB Wishbone Bridge for CPU<->USB Host communication
+
+filesets:
+  rtl:
+    files:
+      - rtl/usb_bridge_csr_reg_pkg.sv
+      - rtl/usb_bridge_csr_reg_top.sv
+      - rtl/usb_bridge_tx_fifo.sv
+      - rtl/usb_bridge_rx_fifo.sv
+      - rtl/usb_wishbone_bridge.sv
+    file_type: systemVerilogSource
+    depend:
+      - mono:ip:csr
+
+targets:
+  default: &default
+    filesets: [rtl]
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    toplevel: usb_wishbone_bridge
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+          - -Wno-PINCONNECTEMPTY
+          - -Wno-UNUSEDSIGNAL
+          - --top-module usb_wishbone_bridge
+
+  sim:
+    <<: *default
+    default_tool: verilator
+    toplevel: usb_wishbone_bridge
+    tools:
+      verilator:
+        verilator_options:
+          - --trace
+          - --trace-fst
