@@ -1,0 +1,30 @@
+// Lint waivers for ibex_soc
+// Format: lint_off -rule <RULE> -file "<glob>" [-line <num>] [-match "<regex>"]
+
+`verilator_config
+
+// Ibex core has known combinational loops in the controller
+// These are intentional and verified in the Ibex project
+lint_off -rule UNOPTFLAT -file "*/ibex_controller.sv"
+lint_off -rule UNOPTFLAT -file "*/ibex_id_stage.sv"
+lint_off -rule UNOPTFLAT -file "*/ibex_core.sv"
+
+// Wishbone crossbar: transpose pattern routes signals between decoder and
+// arbiters. No actual combinational loop - forward data path with stall-only
+// feedback. Verilator flags the array transpose structure conservatively.
+lint_off -rule UNOPTFLAT -file "*/wb_crossbar.sv"
+
+// Wishbone arbiter: priority encoder (winner_idx, winner_valid) and stall
+// handshaking (stall_o depends on req_i) are inherently combinational.
+// Standard arbiter design - no internal feedback loops.
+lint_off -rule UNOPTFLAT -file "*/wb_crossbar_arbiter.sv"
+
+// Unused address bits: 32-bit bus but smaller memory regions
+// TCM only uses bits needed for its depth
+lint_off -rule UNUSEDSIGNAL -file "*/wb_tcm.sv" -match "*wb_adr_i*"
+
+// Timer only uses bits needed for register decode
+lint_off -rule UNUSEDSIGNAL -file "*/wb_timer.sv" -match "*wb_adr_i*"
+
+// Width expansions from smaller constants to bus widths are expected
+lint_off -rule WIDTHEXPAND -file "*/ibex_*.sv"

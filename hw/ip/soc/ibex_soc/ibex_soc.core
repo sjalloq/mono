@@ -6,8 +6,6 @@ filesets:
   rtl:
     files:
       - rtl/ibex_soc_pkg.sv
-      - rtl/ibex_soc_csr.sv
-      - rtl/ibex_soc_mailbox.sv
       - rtl/ibex_soc_top.sv
     file_type: systemVerilogSource
     depend:
@@ -16,26 +14,32 @@ filesets:
       - mono:ip:tcm
       - mono:ip:timer
 
+  verilator_waivers:
+    files:
+      - lint/verilator.vlt: {file_type: vlt}
+
 targets:
   default: &default
-    filesets: [rtl]
+    filesets:
+      - rtl
+      - "tool_verilator ? (verilator_waivers)"
 
   lint:
     <<: *default
+    toplevel: ibex_soc_top
     default_tool: verilator
     tools:
       verilator:
         mode: lint-only
         verilator_options:
           - -Wall
-          - --top-module ibex_soc_top
 
   sim:
     <<: *default
+    toplevel: ibex_soc_top
     default_tool: verilator
     tools:
       verilator:
         verilator_options:
           - --trace
           - --trace-fst
-          - --top-module ibex_soc_top

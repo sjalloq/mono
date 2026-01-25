@@ -17,7 +17,13 @@ make docs                 # Build Sphinx documentation
 ## Key Docs
 
 - Functional spec: `docs/source/`
-- SV conversion strategy: `docs/source/sv_conversion.rst`
+- SV coding guidelines: `docs/guides/verilog/index.md`
+- Migen FuseSoC generators: `docs/guides/migen_generator.md`
+- XDC generator: `docs/guides/xdc_generator.md`
+
+## Ibex CPU
+
+Ibex is checked out as a Git submodule under `third_party/ibex`.
 
 ## Conventions
 
@@ -32,6 +38,21 @@ make docs                 # Build Sphinx documentation
 - **verilator**: Preferred simulator
 
 Tools are normally loaded via Environment Modules.
+
+## Running FuseSoC
+
+FuseSoC commands **must be run from the repo root** (`/home/sjalloq/Work/mono`) where `fusesoc.conf` is located.
+
+```bash
+# Always cd to repo root first, then source and run
+cd /home/sjalloq/Work/mono && source sourceme && fusesoc run --target=lint <core-vlnv>
+
+# Examples:
+cd /home/sjalloq/Work/mono && source sourceme && fusesoc run --target=lint mono:ip:ibex_soc
+cd /home/sjalloq/Work/mono && source sourceme && fusesoc run --target=sim mono:ip:ibex_soc
+```
+
+Build outputs go to `build/<core_name>/<target>-<tool>/`.
 
 ## Migen Netlister
 

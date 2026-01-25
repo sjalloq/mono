@@ -8,8 +8,6 @@
 // - Wishbone pipelined crossbar
 // - ITCM and DTCM memories
 // - RISC-V timer
-// - Control/Status registers
-// - Mailbox for host communication
 // - USB Etherbone master interface
 
 module ibex_soc_top
@@ -29,11 +27,7 @@ module ibex_soc_top
     output logic [31:0]      eb_dat_o,
     output logic             eb_ack_o,
     output logic             eb_err_o,
-    output logic             eb_stall_o,
-
-    // GPIO
-    output logic [1:0]       led_o,
-    input  logic [1:0]       sw_i
+    output logic             eb_stall_o
 );
 
     // =========================================================================
@@ -52,62 +46,59 @@ module ibex_soc_top
     logic        cpu_dbus_ack, cpu_dbus_err, cpu_dbus_stall;
 
     // Crossbar master signals (packed arrays)
-    logic [NUM_MASTERS-1:0]        m_cyc, m_stb, m_we;
-    logic [NUM_MASTERS-1:0][31:0]  m_adr, m_dat_w, m_dat_r;
-    logic [NUM_MASTERS-1:0][3:0]   m_sel;
-    logic [NUM_MASTERS-1:0]        m_ack, m_err, m_stall;
+    logic [NumMasters-1:0]        m_cyc, m_stb, m_we;
+    logic [NumMasters-1:0][31:0]  m_adr, m_dat_w, m_dat_r;
+    logic [NumMasters-1:0][3:0]   m_sel;
+    logic [NumMasters-1:0]        m_ack, m_err, m_stall;
 
     // Crossbar slave signals (packed arrays)
-    logic [NUM_SLAVES-1:0]         s_cyc, s_stb, s_we;
-    logic [NUM_SLAVES-1:0][31:0]   s_adr, s_dat_w, s_dat_r;
-    logic [NUM_SLAVES-1:0][3:0]    s_sel;
-    logic [NUM_SLAVES-1:0]         s_ack, s_err, s_stall;
+    logic [NumSlaves-1:0]         s_cyc, s_stb, s_we;
+    logic [NumSlaves-1:0][31:0]   s_adr, s_dat_w, s_dat_r;
+    logic [NumSlaves-1:0][3:0]    s_sel;
+    logic [NumSlaves-1:0]         s_ack, s_err, s_stall;
 
     // Interrupts
     logic timer_irq;
-    logic mailbox_h2c_irq, mailbox_c2h_irq;
-    logic csr_irq;
-    logic cpu_rst;
 
     // =========================================================================
     // Pack master signals into crossbar format
     // =========================================================================
 
     // Master 0: CPU I-bus
-    assign m_cyc[MASTER_IBUS]   = cpu_ibus_cyc;
-    assign m_stb[MASTER_IBUS]   = cpu_ibus_stb;
-    assign m_we[MASTER_IBUS]    = cpu_ibus_we;
-    assign m_adr[MASTER_IBUS]   = cpu_ibus_adr;
-    assign m_sel[MASTER_IBUS]   = cpu_ibus_sel;
-    assign m_dat_w[MASTER_IBUS] = cpu_ibus_dat_w;
-    assign cpu_ibus_dat_r       = m_dat_r[MASTER_IBUS];
-    assign cpu_ibus_ack         = m_ack[MASTER_IBUS];
-    assign cpu_ibus_err         = m_err[MASTER_IBUS];
-    assign cpu_ibus_stall       = m_stall[MASTER_IBUS];
+    assign m_cyc[MasterIbus]   = cpu_ibus_cyc;
+    assign m_stb[MasterIbus]   = cpu_ibus_stb;
+    assign m_we[MasterIbus]    = cpu_ibus_we;
+    assign m_adr[MasterIbus]   = cpu_ibus_adr;
+    assign m_sel[MasterIbus]   = cpu_ibus_sel;
+    assign m_dat_w[MasterIbus] = cpu_ibus_dat_w;
+    assign cpu_ibus_dat_r      = m_dat_r[MasterIbus];
+    assign cpu_ibus_ack        = m_ack[MasterIbus];
+    assign cpu_ibus_err        = m_err[MasterIbus];
+    assign cpu_ibus_stall      = m_stall[MasterIbus];
 
     // Master 1: CPU D-bus
-    assign m_cyc[MASTER_DBUS]   = cpu_dbus_cyc;
-    assign m_stb[MASTER_DBUS]   = cpu_dbus_stb;
-    assign m_we[MASTER_DBUS]    = cpu_dbus_we;
-    assign m_adr[MASTER_DBUS]   = cpu_dbus_adr;
-    assign m_sel[MASTER_DBUS]   = cpu_dbus_sel;
-    assign m_dat_w[MASTER_DBUS] = cpu_dbus_dat_w;
-    assign cpu_dbus_dat_r       = m_dat_r[MASTER_DBUS];
-    assign cpu_dbus_ack         = m_ack[MASTER_DBUS];
-    assign cpu_dbus_err         = m_err[MASTER_DBUS];
-    assign cpu_dbus_stall       = m_stall[MASTER_DBUS];
+    assign m_cyc[MasterDbus]   = cpu_dbus_cyc;
+    assign m_stb[MasterDbus]   = cpu_dbus_stb;
+    assign m_we[MasterDbus]    = cpu_dbus_we;
+    assign m_adr[MasterDbus]   = cpu_dbus_adr;
+    assign m_sel[MasterDbus]   = cpu_dbus_sel;
+    assign m_dat_w[MasterDbus] = cpu_dbus_dat_w;
+    assign cpu_dbus_dat_r      = m_dat_r[MasterDbus];
+    assign cpu_dbus_ack        = m_ack[MasterDbus];
+    assign cpu_dbus_err        = m_err[MasterDbus];
+    assign cpu_dbus_stall      = m_stall[MasterDbus];
 
     // Master 2: Etherbone
-    assign m_cyc[MASTER_EB]     = eb_cyc_i;
-    assign m_stb[MASTER_EB]     = eb_stb_i;
-    assign m_we[MASTER_EB]      = eb_we_i;
-    assign m_adr[MASTER_EB]     = eb_adr_i;
-    assign m_sel[MASTER_EB]     = eb_sel_i;
-    assign m_dat_w[MASTER_EB]   = eb_dat_i;
-    assign eb_dat_o             = m_dat_r[MASTER_EB];
-    assign eb_ack_o             = m_ack[MASTER_EB];
-    assign eb_err_o             = m_err[MASTER_EB];
-    assign eb_stall_o           = m_stall[MASTER_EB];
+    assign m_cyc[MasterEb]     = eb_cyc_i;
+    assign m_stb[MasterEb]     = eb_stb_i;
+    assign m_we[MasterEb]      = eb_we_i;
+    assign m_adr[MasterEb]     = eb_adr_i;
+    assign m_sel[MasterEb]     = eb_sel_i;
+    assign m_dat_w[MasterEb]   = eb_dat_i;
+    assign eb_dat_o            = m_dat_r[MasterEb];
+    assign eb_ack_o            = m_ack[MasterEb];
+    assign eb_err_o            = m_err[MasterEb];
+    assign eb_stall_o          = m_stall[MasterEb];
 
     // =========================================================================
     // Ibex CPU
@@ -119,12 +110,12 @@ module ibex_soc_top
         .PMPEnable       (1'b0),
         .RV32E           (1'b0),
         .RV32B           (1'b0),
-        .BootAddr        (BOOT_ADDR)
+        .BootAddr        (BootAddr)
     ) u_cpu (
         .clk_i           (clk_i),
-        .rst_ni          (rst_ni && !cpu_rst),
+        .rst_ni          (rst_ni),
 
-        .boot_addr_i     (BOOT_ADDR),
+        .boot_addr_i     (BootAddr),
 
         // Instruction bus
         .ibus_cyc_o      (cpu_ibus_cyc),
@@ -153,8 +144,8 @@ module ibex_soc_top
         // Interrupts
         .irq_software_i  (1'b0),
         .irq_timer_i     (timer_irq),
-        .irq_external_i  (csr_irq),
-        .irq_fast_i      ({13'b0, mailbox_c2h_irq, mailbox_h2c_irq}),
+        .irq_external_i  (1'b0),
+        .irq_fast_i      (15'b0),
         .irq_nm_i        (1'b0),
 
         // CPU control
@@ -167,12 +158,12 @@ module ibex_soc_top
     // =========================================================================
 
     wb_crossbar #(
-        .NUM_MASTERS (NUM_MASTERS),
-        .NUM_SLAVES  (NUM_SLAVES),
-        .AW          (32),
-        .DW          (32),
-        .SLAVE_BASE  (get_slave_bases()),
-        .SLAVE_MASK  (get_slave_masks())
+        .NumMasters (NumMasters),
+        .NumSlaves  (NumSlaves),
+        .AddrWidth  (32),
+        .DataWidth  (32),
+        .AddrBase   (getSlaveAddrs()),
+        .AddrMask   (getSlaveMasks())
     ) u_crossbar (
         .clk_i       (clk_i),
         .rst_ni      (rst_ni),
@@ -207,24 +198,24 @@ module ibex_soc_top
     // =========================================================================
 
     wb_tcm #(
-        .SIZE      (ITCM_SIZE),
-        .AW        (32),
-        .DW        (32),
-        .INIT_FILE ("")
+        .Size     (ItcmSize),
+        .AW       (32),
+        .DW       (32),
+        .InitFile ("")
     ) u_itcm (
         .clk_i     (clk_i),
         .rst_ni    (rst_ni),
 
-        .wb_cyc_i  (s_cyc[SLAVE_ITCM]),
-        .wb_stb_i  (s_stb[SLAVE_ITCM]),
-        .wb_we_i   (s_we[SLAVE_ITCM]),
-        .wb_adr_i  (s_adr[SLAVE_ITCM]),
-        .wb_sel_i  (s_sel[SLAVE_ITCM]),
-        .wb_dat_i  (s_dat_w[SLAVE_ITCM]),
-        .wb_dat_o  (s_dat_r[SLAVE_ITCM]),
-        .wb_ack_o  (s_ack[SLAVE_ITCM]),
-        .wb_err_o  (s_err[SLAVE_ITCM]),
-        .wb_stall_o(s_stall[SLAVE_ITCM])
+        .wb_cyc_i  (s_cyc[SlaveItcm]),
+        .wb_stb_i  (s_stb[SlaveItcm]),
+        .wb_we_i   (s_we[SlaveItcm]),
+        .wb_adr_i  (s_adr[SlaveItcm]),
+        .wb_sel_i  (s_sel[SlaveItcm]),
+        .wb_dat_i  (s_dat_w[SlaveItcm]),
+        .wb_dat_o  (s_dat_r[SlaveItcm]),
+        .wb_ack_o  (s_ack[SlaveItcm]),
+        .wb_err_o  (s_err[SlaveItcm]),
+        .wb_stall_o(s_stall[SlaveItcm])
     );
 
     // =========================================================================
@@ -232,50 +223,24 @@ module ibex_soc_top
     // =========================================================================
 
     wb_tcm #(
-        .SIZE      (DTCM_SIZE),
-        .AW        (32),
-        .DW        (32),
-        .INIT_FILE ("")
+        .Size     (DtcmSize),
+        .AW       (32),
+        .DW       (32),
+        .InitFile ("")
     ) u_dtcm (
         .clk_i     (clk_i),
         .rst_ni    (rst_ni),
 
-        .wb_cyc_i  (s_cyc[SLAVE_DTCM]),
-        .wb_stb_i  (s_stb[SLAVE_DTCM]),
-        .wb_we_i   (s_we[SLAVE_DTCM]),
-        .wb_adr_i  (s_adr[SLAVE_DTCM]),
-        .wb_sel_i  (s_sel[SLAVE_DTCM]),
-        .wb_dat_i  (s_dat_w[SLAVE_DTCM]),
-        .wb_dat_o  (s_dat_r[SLAVE_DTCM]),
-        .wb_ack_o  (s_ack[SLAVE_DTCM]),
-        .wb_err_o  (s_err[SLAVE_DTCM]),
-        .wb_stall_o(s_stall[SLAVE_DTCM])
-    );
-
-    // =========================================================================
-    // CSR Block
-    // =========================================================================
-
-    ibex_soc_csr u_csr (
-        .clk_i     (clk_i),
-        .rst_ni    (rst_ni),
-
-        .wb_cyc_i  (s_cyc[SLAVE_CSR]),
-        .wb_stb_i  (s_stb[SLAVE_CSR]),
-        .wb_we_i   (s_we[SLAVE_CSR]),
-        .wb_adr_i  (s_adr[SLAVE_CSR]),
-        .wb_sel_i  (s_sel[SLAVE_CSR]),
-        .wb_dat_i  (s_dat_w[SLAVE_CSR]),
-        .wb_dat_o  (s_dat_r[SLAVE_CSR]),
-        .wb_ack_o  (s_ack[SLAVE_CSR]),
-        .wb_err_o  (s_err[SLAVE_CSR]),
-        .wb_stall_o(s_stall[SLAVE_CSR]),
-
-        .led_o     (led_o),
-        .sw_i      (sw_i),
-        .cpu_rst_o (cpu_rst),
-        .irq_src_i ({14'b0, mailbox_c2h_irq, mailbox_h2c_irq}),
-        .irq_o     (csr_irq)
+        .wb_cyc_i  (s_cyc[SlaveDtcm]),
+        .wb_stb_i  (s_stb[SlaveDtcm]),
+        .wb_we_i   (s_we[SlaveDtcm]),
+        .wb_adr_i  (s_adr[SlaveDtcm]),
+        .wb_sel_i  (s_sel[SlaveDtcm]),
+        .wb_dat_i  (s_dat_w[SlaveDtcm]),
+        .wb_dat_o  (s_dat_r[SlaveDtcm]),
+        .wb_ack_o  (s_ack[SlaveDtcm]),
+        .wb_err_o  (s_err[SlaveDtcm]),
+        .wb_stall_o(s_stall[SlaveDtcm])
     );
 
     // =========================================================================
@@ -286,41 +251,18 @@ module ibex_soc_top
         .clk_i      (clk_i),
         .rst_ni     (rst_ni),
 
-        .wb_cyc_i   (s_cyc[SLAVE_TIMER]),
-        .wb_stb_i   (s_stb[SLAVE_TIMER]),
-        .wb_we_i    (s_we[SLAVE_TIMER]),
-        .wb_adr_i   (s_adr[SLAVE_TIMER]),
-        .wb_sel_i   (s_sel[SLAVE_TIMER]),
-        .wb_dat_i   (s_dat_w[SLAVE_TIMER]),
-        .wb_dat_o   (s_dat_r[SLAVE_TIMER]),
-        .wb_ack_o   (s_ack[SLAVE_TIMER]),
-        .wb_err_o   (s_err[SLAVE_TIMER]),
-        .wb_stall_o (s_stall[SLAVE_TIMER]),
+        .wb_cyc_i   (s_cyc[SlaveTimer]),
+        .wb_stb_i   (s_stb[SlaveTimer]),
+        .wb_we_i    (s_we[SlaveTimer]),
+        .wb_adr_i   (s_adr[SlaveTimer]),
+        .wb_sel_i   (s_sel[SlaveTimer]),
+        .wb_dat_i   (s_dat_w[SlaveTimer]),
+        .wb_dat_o   (s_dat_r[SlaveTimer]),
+        .wb_ack_o   (s_ack[SlaveTimer]),
+        .wb_err_o   (s_err[SlaveTimer]),
+        .wb_stall_o (s_stall[SlaveTimer]),
 
         .timer_irq_o(timer_irq)
-    );
-
-    // =========================================================================
-    // Mailbox
-    // =========================================================================
-
-    ibex_soc_mailbox u_mailbox (
-        .clk_i             (clk_i),
-        .rst_ni            (rst_ni),
-
-        .wb_cyc_i          (s_cyc[SLAVE_MAILBOX]),
-        .wb_stb_i          (s_stb[SLAVE_MAILBOX]),
-        .wb_we_i           (s_we[SLAVE_MAILBOX]),
-        .wb_adr_i          (s_adr[SLAVE_MAILBOX]),
-        .wb_sel_i          (s_sel[SLAVE_MAILBOX]),
-        .wb_dat_i          (s_dat_w[SLAVE_MAILBOX]),
-        .wb_dat_o          (s_dat_r[SLAVE_MAILBOX]),
-        .wb_ack_o          (s_ack[SLAVE_MAILBOX]),
-        .wb_err_o          (s_err[SLAVE_MAILBOX]),
-        .wb_stall_o        (s_stall[SLAVE_MAILBOX]),
-
-        .irq_host_to_cpu_o (mailbox_h2c_irq),
-        .irq_cpu_to_host_o (mailbox_c2h_irq)
     );
 
 endmodule

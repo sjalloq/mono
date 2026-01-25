@@ -7,10 +7,10 @@
 // Supports optional initialization from hex file.
 
 module wb_tcm #(
-    parameter int unsigned SIZE      = 16384,  // Size in bytes
+    parameter int unsigned Size      = 16384,  // Size in bytes
     parameter int unsigned AW        = 32,     // Address width
     parameter int unsigned DW        = 32,     // Data width
-    parameter string       INIT_FILE = ""      // Optional hex init file
+    parameter string       InitFile  = ""      // Optional hex init file
 ) (
     input  logic             clk_i,
     input  logic             rst_ni,
@@ -29,29 +29,25 @@ module wb_tcm #(
 );
 
     // Internal parameters
-    localparam int unsigned DEPTH    = SIZE / (DW / 8);
-    localparam int unsigned AW_LOCAL = $clog2(DEPTH);
+    localparam int unsigned Depth   = Size / (DW / 8);
+    localparam int unsigned AwLocal = $clog2(Depth);
 
     // Memory array
-    logic [DW-1:0] mem [DEPTH];
+    logic [DW-1:0] mem [Depth];
 
     // Word address from byte address
-    logic [AW_LOCAL-1:0] word_addr;
-    assign word_addr = wb_adr_i[$clog2(DW/8) +: AW_LOCAL];
+    logic [AwLocal-1:0] word_addr;
+    assign word_addr = wb_adr_i[$clog2(DW/8) +: AwLocal];
 
     // Valid access check
     logic valid_access;
     assign valid_access = wb_cyc_i && wb_stb_i;
 
-    // Address range check
-    logic addr_in_range;
-    assign addr_in_range = (wb_adr_i[$clog2(DW/8) +: AW_LOCAL] < DEPTH);
-
     // Pipelined: never stall (single-cycle access)
     assign wb_stall_o = 1'b0;
 
-    // Error on out-of-range access
-    assign wb_err_o = valid_access && !addr_in_range;
+    // No error - crossbar ensures address is in range via address decode
+    assign wb_err_o = 1'b0;
 
     // Registered outputs
     logic wb_ack_d, wb_ack_q;
@@ -63,11 +59,11 @@ module wb_tcm #(
 
     // Combinational logic
     always_comb begin
-        wb_ack_d = valid_access && addr_in_range;
+        wb_ack_d = valid_access;
         wb_dat_d = mem[word_addr];
 
         // Memory write data with byte enables
-        mem_we = valid_access && addr_in_range && wb_we_i;
+        mem_we = valid_access && wb_we_i;
         mem_wdata = mem[word_addr];
         for (int i = 0; i < DW/8; i++) begin
             if (wb_sel_i[i]) begin
@@ -100,8 +96,8 @@ module wb_tcm #(
 
     // Optional memory initialization
     initial begin
-        if (INIT_FILE != "") begin
-            $readmemh(INIT_FILE, mem);
+        if (InitFile != "") begin
+            $readmemh(InitFile, mem);
         end
     end
 

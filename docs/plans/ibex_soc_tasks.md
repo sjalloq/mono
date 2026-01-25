@@ -26,10 +26,43 @@
 | OBI-to-WB Bridge | `hw/ip/cpu/ibex/rtl/ibex_obi2wb.sv` |
 | Ibex WB Wrapper | `hw/ip/cpu/ibex/rtl/ibex_wb_top.sv` |
 | FT601 PHY | `hw/ip/usb/ft601/rtl/ft601_sync.sv` |
-| SoC CSR Block | `hw/ip/soc/ibex_soc/rtl/ibex_soc_csr.sv` |
-| SoC Mailbox | `hw/ip/soc/ibex_soc/rtl/ibex_soc_mailbox.sv` |
 | SoC Top Level | `hw/ip/soc/ibex_soc/rtl/ibex_soc_top.sv` |
 | Board Top Level | `hw/projects/squirrel/ibex_soc/rtl/squirrel_ibex_top.sv` |
+
+## Architecture
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                              ibex_soc_top                  │
+│                                                            │
+│  ┌─────────────────────┐                                   │
+│  │    ibex_wb_top      │                                   │
+│  │  ┌───────────────┐  │                                   │
+│  │  │   ibex_top    │  │   ┌───────────────┐               │
+│  │  └───────────────┘  │   │ Etherbone     |               │
+│  │    │           │    │   | (USB host)    |               │
+│  │  ibus        dbus   │   └──────┬────────┘               │
+│  └────┼───────────┼────┘          │                        |
+│       │           │               |                        |
+│       │  Master 0 │  Master 1     │ Master 2               │
+│       ▼           ▼               ▼                        │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │                     wb_crossbar (3x3)                │  │
+│  │                  Priority: ibus > dbus > eb          │  │
+│  └──────┬─────────────────┬─────────────────┬───────────┘  │
+│         │                 │                 │              │
+│     Slave 0           Slave 1           Slave 2            │
+│         │                 │                 │              │
+│         ▼                 ▼                 ▼              │
+│  ┌──────────┐ ┌─────────┐ ┌───────┐                         │
+│  │   ITCM   │ │   DTCM  │ │ Timer │                         │
+│  │  16KB    │ │  16KB   │ │       │                         │
+│  └──────────┘ └─────────┘ └───────┘                         │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
+```
+
+Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-port).
 
 ---
 
@@ -39,9 +72,7 @@
 |--------|------|------|-------------|
 | ITCM | `0x0001_0000` | 16KB | Instruction memory |
 | DTCM | `0x0002_0000` | 16KB | Data memory |
-| CSR | `0x1000_0000` | 4KB | Control/status registers |
-| Timer | `0x1000_1000` | 4KB | RISC-V timer |
-| Mailbox | `0x2000_0000` | 4KB | Host↔CPU communication |
+| Timer | `0x1000_0000` | 4KB | RISC-V timer |
 
 ---
 
