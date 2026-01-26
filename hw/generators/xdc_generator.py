@@ -15,13 +15,28 @@ from pathlib import Path
 from fusesoc.capi2.generator import Generator
 
 
+def find_repo_root(start_path: Path) -> Path | None:
+    """
+    Find the repository root by walking up from start_path.
+
+    Looks for fusesoc.conf or .git directory as indicators of the repo root.
+    """
+    current = start_path.resolve()
+    while current != current.parent:
+        if (current / "fusesoc.conf").exists() or (current / ".git").exists():
+            return current
+        current = current.parent
+    return None
+
+
 class XDCGenerator(Generator):
     """
     FuseSoC generator for creating XDC constraint files.
 
     Parameters (from core file):
-        board: Path to board YAML file (relative to core file or absolute)
-        toplevel: Path to toplevel SystemVerilog file (optional, for port parsing)
+        board: Board name (e.g., "squirrel"). The generator will look for the
+               board definition at <repo_root>/hw/boards/<board>/board.yaml
+        toplevel: Path to toplevel SystemVerilog file (relative to core file)
         output: Output XDC filename (default: constraints.xdc)
         pin_map: Optional dict mapping SV port names to board pin paths
                  (e.g., {"usb_data": "usb_fifo.data"})
@@ -31,7 +46,7 @@ class XDCGenerator(Generator):
           constraints:
             generator: xdc_generator
             parameters:
-              board: board.yaml
+              board: squirrel
               toplevel: rtl/top.sv
               output: project.xdc
               pin_map:
@@ -40,33 +55,39 @@ class XDCGenerator(Generator):
     """
 
     def run(self):
-        board_path = self.config.get("board")
+        board_name = self.config.get("board")
         toplevel_path = self.config.get("toplevel")
         output_name = self.config.get("output", "constraints.xdc")
         pin_map = self.config.get("pin_map", {})
 
-        if not board_path:
+        if not board_name:
             print("Error: 'board' parameter is required", file=sys.stderr)
             sys.exit(1)
 
-        # Resolve paths relative to files root if provided
-        files_root = Path(self.config.get("files_root", "."))
-        board_file = files_root / board_path
-        if not board_file.exists():
-            # Try as absolute path
-            board_file = Path(board_path)
-            if not board_file.exists():
-                print(f"Error: Board file not found: {board_path}", file=sys.stderr)
-                sys.exit(1)
+        # Get files_root (the calling core's directory)
+        files_root = Path(self.files_root) if hasattr(self, 'files_root') else Path(".")
 
+        # Find the repository root
+        repo_root = find_repo_root(files_root)
+        if not repo_root:
+            print(f"Error: Could not find repository root from {files_root}", file=sys.stderr)
+            print("Looking for fusesoc.conf or .git directory", file=sys.stderr)
+            sys.exit(1)
+
+        # Resolve board file using convention: hw/boards/<board>/board.yaml
+        board_file = repo_root / "hw" / "boards" / board_name / "board.yaml"
+        if not board_file.exists():
+            print(f"Error: Board file not found: {board_file}", file=sys.stderr)
+            print(f"Expected board definition at: hw/boards/{board_name}/board.yaml", file=sys.stderr)
+            sys.exit(1)
+
+        # Resolve toplevel file relative to files_root
         toplevel_file = None
         if toplevel_path:
             toplevel_file = files_root / toplevel_path
             if not toplevel_file.exists():
-                toplevel_file = Path(toplevel_path)
-                if not toplevel_file.exists():
-                    print(f"Error: Toplevel file not found: {toplevel_path}", file=sys.stderr)
-                    sys.exit(1)
+                print(f"Error: Toplevel file not found: {toplevel_file}", file=sys.stderr)
+                sys.exit(1)
 
         # Import the XDC library
         try:

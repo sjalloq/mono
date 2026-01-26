@@ -232,14 +232,16 @@ class XDCGenerator:
                 lines.append(f"set_property {key} {value} [current_design]")
             lines.append("")
 
-        # Clock constraints
+        # Clock constraints (only for clocks with matching SV ports)
+        sv_port_names = {p.name for p in self.sv_ports}
         lines.append("# Clock Constraints")
         for name, clock in self.board.clocks.items():
-            period_ns = 1e9 / clock.frequency
-            lines.append(
-                f"create_clock -period {period_ns:.3f} -name {clock.name or name} "
-                f"[get_ports {{{name}}}]"
-            )
+            if name in sv_port_names:
+                period_ns = 1e9 / clock.frequency
+                lines.append(
+                    f"create_clock -period {period_ns:.3f} -name {clock.name or name} "
+                    f"[get_ports {{{name}}}]"
+                )
         lines.append("")
 
         # Pin assignments
@@ -272,14 +274,26 @@ class XDCGenerator:
                 )
         lines.append("")
 
-        # Timing constraints
+        # Timing constraints (only for ports that exist in RTL)
         if self.board.timing:
             lines.append("# Timing Constraints")
             for name, timing in self.board.timing.items():
+                # Check if the timing clock exists in the RTL
+                clk_port = timing.clk.split(".")[-1] if "." in timing.clk else timing.clk
+                timing_clk_exists = any(
+                    p.name == clk_port or p.name == f"{name}_{clk_port}"
+                    for p in self.sv_ports
+                )
+                if not timing_clk_exists:
+                    continue
+
                 clk_name = self.board.resolve_clock_ref(timing.clk)
                 if timing.input_delay:
                     for port in timing.input_delay.get("ports", []):
                         port_ref = self._resolve_port_ref(name, port)
+                        # Only emit if port exists in RTL
+                        if not self._port_exists(name, port):
+                            continue
                         min_delay = timing.input_delay.get("min", 0)
                         max_delay = timing.input_delay.get("max", 0)
                         lines.append(
@@ -293,6 +307,9 @@ class XDCGenerator:
                 if timing.output_delay:
                     for port in timing.output_delay.get("ports", []):
                         port_ref = self._resolve_port_ref(name, port)
+                        # Only emit if port exists in RTL
+                        if not self._port_exists(name, port):
+                            continue
                         min_delay = timing.output_delay.get("min", 0)
                         max_delay = timing.output_delay.get("max", 0)
                         lines.append(
@@ -305,10 +322,18 @@ class XDCGenerator:
                         )
             lines.append("")
 
-        # False paths
+        # False paths (only if both clocks exist in RTL)
         if self.board.false_paths:
             lines.append("# False Paths / Clock Domain Crossings")
             for fp in self.board.false_paths:
+                # Check if both clocks exist in the RTL
+                from_clk_name = fp.from_clk.split(".")[-1] if "." in fp.from_clk else fp.from_clk
+                to_clk_name = fp.to_clk.split(".")[-1] if "." in fp.to_clk else fp.to_clk
+                from_exists = from_clk_name in sv_port_names
+                to_exists = to_clk_name in sv_port_names
+                if not (from_exists and to_exists):
+                    continue
+
                 from_clk = self.board.resolve_clock_ref(fp.from_clk)
                 to_clk = self.board.resolve_clock_ref(fp.to_clk)
                 lines.append(
@@ -334,3 +359,8 @@ class XDCGenerator:
                     return f"{port.name}[*]"
                 return port.name
         return f"{bus_name}_{sig_name}"
+
+    def _port_exists(self, bus_name: str, sig_name: str) -> bool:
+        """Check if a port exists in the SV port list."""
+        expected_name = f"{bus_name}_{sig_name}"
+        return any(p.name == expected_name for p in self.sv_ports)

@@ -12,7 +12,10 @@
 
 module ibex_soc_top
     import ibex_soc_pkg::*;
-(
+#(
+    parameter string ItcmInitFile = "",  // Hex file for ITCM initialization
+    parameter string DtcmInitFile = ""   // Hex file for DTCM initialization
+) (
     input  logic             clk_i,
     input  logic             rst_ni,
 
@@ -201,7 +204,7 @@ module ibex_soc_top
         .Size     (ItcmSize),
         .AW       (32),
         .DW       (32),
-        .InitFile ("")
+        .InitFile (ItcmInitFile)
     ) u_itcm (
         .clk_i     (clk_i),
         .rst_ni    (rst_ni),
@@ -226,7 +229,7 @@ module ibex_soc_top
         .Size     (DtcmSize),
         .AW       (32),
         .DW       (32),
-        .InitFile ("")
+        .InitFile (DtcmInitFile)
     ) u_dtcm (
         .clk_i     (clk_i),
         .rst_ni    (rst_ni),

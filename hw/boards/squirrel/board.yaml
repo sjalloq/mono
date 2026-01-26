@@ -1,4 +1,4 @@
-# Squirrel / CaptainDMA 4.1th Board Definition
+# LambdaConcept PCIe Squirrel / CaptainDMA 4.1th Board Definition
 #
 # Pin-compatible boards using XC7A35T-FGG484.
 # Constraints derived from pcileech-fpga XDC files.

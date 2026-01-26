@@ -1,0 +1,13 @@
+CAPI=2:
+name: mono:ip:mmcm:0.1.0
+description: Xilinx MMCM wrapper - parameterized multi-output clock generator
+
+filesets:
+  rtl:
+    files:
+      - rtl/mmcm.sv
+    file_type: systemVerilogSource
+
+targets:
+  default:
+    filesets: [rtl]

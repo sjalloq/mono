@@ -18,11 +18,25 @@ filesets:
     files:
       - lint/verilator.vlt: {file_type: vlt}
 
+parameters:
+  ItcmInitFile:
+    datatype: file
+    description: Hex file for ITCM initialization (instruction memory)
+    paramtype: vlogparam
+
+  DtcmInitFile:
+    datatype: file
+    description: Hex file for DTCM initialization (data memory)
+    paramtype: vlogparam
+
 targets:
   default: &default
     filesets:
       - rtl
       - "tool_verilator ? (verilator_waivers)"
+    parameters:
+      - ItcmInitFile
+      - DtcmInitFile
 
   lint:
     <<: *default

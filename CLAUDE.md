@@ -1,5 +1,13 @@
 # Project: mono
 
+## Rules
+
+1. **Task list is the golden truth**: `docs/plans/ibex_soc_tasks.md` must be kept up to date after each task is completed. Update the status table and add an entry to the Work Log section.
+
+2. **Track all work**: When completing a task, document what was done, files changed, and any issues encountered in the Work Log.
+
+3. **Investigate lint warnings**: Don't globally waive lint errors. For each warning, investigate whether it's a real bug or expected behavior before adding targeted waivers with justification.
+
 ## Quick Commands
 
 ```bash

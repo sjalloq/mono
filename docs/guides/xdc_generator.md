@@ -13,9 +13,14 @@ The XDC generator solves the problem of maintaining constraints separately from 
 ## Architecture
 
 ```
-hw/boards/<board>/board.yaml  ───┐
-                                 ├──► xdc_generator.py ──► constraints.xdc
-hw/projects/<proj>/rtl/top.sv ───┘
+board: "squirrel" (parameter) ──────────────────────┐
+                                                    │
+     ┌──────────────────────────────────────────────┼─► xdc_generator.py ──► constraints.xdc
+     │                                              │
+     │  Resolved via convention:                    │
+     │  hw/boards/squirrel/board.yaml ──────────────┘
+     │
+hw/projects/<proj>/rtl/top.sv ──────────────────────┘
 ```
 
 ### Components
@@ -231,13 +236,23 @@ generate:
   xdc:
     generator: xdc_generator
     parameters:
-      board: board.yaml        # Path to board definition
-      toplevel: rtl/top.sv     # Path to toplevel SV file
+      board: squirrel          # Board name (resolved to hw/boards/<board>/board.yaml)
+      toplevel: rtl/top.sv     # Path to toplevel SV file (relative to core file)
       output: project.xdc      # Output filename
       pin_map:                 # Optional explicit mappings
         my_clock: clk100
         my_data: usb_fifo.data
 ```
+
+### Board Name Resolution
+
+The `board` parameter is the board name (e.g., `squirrel`), not a file path. The generator automatically resolves it to:
+
+```
+<repo_root>/hw/boards/<board>/board.yaml
+```
+
+The repo root is found by walking up from the calling core's directory until `fusesoc.conf` or `.git` is found. This convention avoids path escaping issues in FuseSoC core files while maintaining a clean separation between board definitions and project-specific code.
 
 ## Generated XDC Output
 

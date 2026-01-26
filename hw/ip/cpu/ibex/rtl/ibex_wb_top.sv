@@ -101,7 +101,7 @@ module ibex_wb_top #(
         .RV32E            (RV32E),
         .RV32M            (ibex_pkg::RV32MSingleCycle),
         .RV32B            (RV32B ? ibex_pkg::RV32BBalanced : ibex_pkg::RV32BNone),
-        .RegFile          (ibex_pkg::RegFileFF),
+        .RegFile          (ibex_pkg::RegFileFPGA),
         .BranchTargetALU  (BranchTargetALU),
         .WritebackStage   (WritebackStage),
         .ICache           (ICache),

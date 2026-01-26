@@ -8,8 +8,9 @@ filesets:
       - rtl/squirrel_ibex_top.sv
     file_type: systemVerilogSource
     depend:
+      - mono:ip:mmcm
       - mono:ip:ibex_soc
-      - mono:ip:ft601
+      # - mono:ip:ft601  # Commented out until USB bridge path is implemented
 
   board:
     depend:
@@ -22,26 +23,41 @@ filesets:
       - pins.yaml: { copyto: pins.yaml }
     file_type: user
 
+parameters:
+  ItcmInitFile:
+    datatype: file
+    description: Hex file for ITCM initialization (instruction memory)
+    paramtype: vlogparam
+
+  DtcmInitFile:
+    datatype: file
+    description: Hex file for DTCM initialization (data memory)
+    paramtype: vlogparam
+
 generate:
   xdc:
     generator: xdc_generator
     parameters:
-      board: board.yaml
+      board: squirrel
       toplevel: rtl/squirrel_ibex_top.sv
       output: squirrel_ibex.xdc
-      # Pin mapping is read from pins.yaml by the generator
-      # if more complex mapping is needed
 
 targets:
   default:
     filesets: [rtl, board]
     toplevel: squirrel_ibex_top
+    parameters:
+      - ItcmInitFile
+      - DtcmInitFile
 
   synth: &synth
     default_tool: vivado
     filesets: [rtl, board, constraints]
     generate: [xdc]
     toplevel: squirrel_ibex_top
+    parameters:
+      - ItcmInitFile
+      - DtcmInitFile
     tools:
       vivado:
         part: xc7a35tfgg484-2
@@ -67,6 +83,9 @@ targets:
     default_tool: verilator
     filesets: [rtl]
     toplevel: squirrel_ibex_top
+    parameters:
+      - ItcmInitFile
+      - DtcmInitFile
     tools:
       verilator:
         verilator_options:
