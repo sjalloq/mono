@@ -1,27 +1,30 @@
 CAPI=2:
-name: mono:ip:ibex_wb:0.1.0
+name: mono:ip:ibex_wb
 description: Ibex RISC-V core with Wishbone pipelined interface
 
 filesets:
   rtl:
+    depend:
+      - lowrisc:ibex:ibex_top
     files:
       - rtl/ibex_obi2wb.sv
       - rtl/ibex_wb_top.sv
     file_type: systemVerilogSource
-    depend:
-      - lowrisc:ibex:ibex_top
 
-  # Force generic primitives for simulation/linting (no Xilinx primitives)
   prim_generic:
     depend:
-      - lowrisc:prim_generic:clock_gating
-      - lowrisc:prim_generic:clock_mux2
+      - lowrisc:prim_generic:all
+
+  prim_xilinx:
+    depend:
+      - lowrisc:prim_xilinx:all
 
 targets:
   default: &default
     filesets:
       - "target_lint ? (prim_generic)"
       - "target_sim ? (prim_generic)"
+      - "target_synth ? (prim_xilinx)"
       - rtl
 
   lint:

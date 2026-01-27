@@ -14,6 +14,7 @@ docs/_build/
 # Fusesoc
 build/
 *.eda.yml
+.flist
 
 # Simulation
 *.vcd
@@ -42,3 +43,10 @@ Thumbs.db
 # Cocotb
 sim_build
 results.xml
+
+# Software
+*.o
+*.dis
+*.elf
+*.map
+*.vmem

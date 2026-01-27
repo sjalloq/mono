@@ -8,6 +8,7 @@
 // - Wishbone pipelined crossbar
 // - ITCM and DTCM memories
 // - RISC-V timer
+// - Simulation control peripheral
 // - USB Etherbone master interface
 
 module ibex_soc_top
@@ -30,7 +31,12 @@ module ibex_soc_top
     output logic [31:0]      eb_dat_o,
     output logic             eb_ack_o,
     output logic             eb_err_o,
-    output logic             eb_stall_o
+    output logic             eb_stall_o,
+
+    // Simulation control outputs (directly accessible by testbench)
+    output logic             sim_halt_o,
+    output logic             sim_char_valid_o,
+    output logic [7:0]       sim_char_data_o
 );
 
     // =========================================================================
@@ -201,10 +207,9 @@ module ibex_soc_top
     // =========================================================================
 
     wb_tcm #(
-        .Size     (ItcmSize),
-        .AW       (32),
-        .DW       (32),
-        .InitFile (ItcmInitFile)
+        .Width       (32),
+        .Depth       (ItcmDepth),
+        .MemInitFile (ItcmInitFile)
     ) u_itcm (
         .clk_i     (clk_i),
         .rst_ni    (rst_ni),
@@ -226,10 +231,9 @@ module ibex_soc_top
     // =========================================================================
 
     wb_tcm #(
-        .Size     (DtcmSize),
-        .AW       (32),
-        .DW       (32),
-        .InitFile (DtcmInitFile)
+        .Width       (32),
+        .Depth       (DtcmDepth),
+        .MemInitFile (DtcmInitFile)
     ) u_dtcm (
         .clk_i     (clk_i),
         .rst_ni    (rst_ni),
@@ -266,6 +270,30 @@ module ibex_soc_top
         .wb_stall_o (s_stall[SlaveTimer]),
 
         .timer_irq_o(timer_irq)
+    );
+
+    // =========================================================================
+    // Simulation Control (printf + halt for Verilator)
+    // =========================================================================
+
+    wb_sim_ctrl u_sim_ctrl (
+        .clk_i      (clk_i),
+        .rst_ni     (rst_ni),
+
+        .wb_cyc_i   (s_cyc[SlaveSimCtrl]),
+        .wb_stb_i   (s_stb[SlaveSimCtrl]),
+        .wb_we_i    (s_we[SlaveSimCtrl]),
+        .wb_adr_i   (s_adr[SlaveSimCtrl]),
+        .wb_sel_i   (s_sel[SlaveSimCtrl]),
+        .wb_dat_i   (s_dat_w[SlaveSimCtrl]),
+        .wb_dat_o   (s_dat_r[SlaveSimCtrl]),
+        .wb_ack_o   (s_ack[SlaveSimCtrl]),
+        .wb_err_o   (s_err[SlaveSimCtrl]),
+        .wb_stall_o (s_stall[SlaveSimCtrl]),
+
+        .sim_halt_o   (sim_halt_o),
+        .char_valid_o (sim_char_valid_o),
+        .char_data_o  (sim_char_data_o)
     );
 
 endmodule

@@ -1,0 +1,22 @@
+`verilator_config
+
+// =============================================================================
+// squirrel_ibex_top.sv waivers
+// =============================================================================
+
+// user_sw[1] is directly connected to a top-level port but not yet used.
+// Reserved for future use; only user_sw[0] is currently used for LED test.
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_ibex_top.sv" -match "Signal is not used: 'user_sw'"
+
+// Etherbone response signals (eb_dat_r, eb_ack, eb_err, eb_stall) are declared
+// but unused because the Etherbone request side is tied off. These will be
+// connected when the USB bridge path is implemented.
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_ibex_top.sv" -match "Signal is not used: 'eb_dat_r'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_ibex_top.sv" -match "Signal is not used: 'eb_ack'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_ibex_top.sv" -match "Signal is not used: 'eb_err'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_ibex_top.sv" -match "Signal is not used: 'eb_stall'"
+
+// Unused MMCM outputs - only clk_sys (62.5 MHz) is currently used.
+// clk_125m and clk_250m reserved for USB/high-speed peripherals.
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_ibex_top.sv" -match "Signal is not used: 'clk_125m'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_ibex_top.sv" -match "Signal is not used: 'clk_250m'"

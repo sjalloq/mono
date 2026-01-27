@@ -7,6 +7,7 @@ Mono
    :caption: Contents:
 
    repository
+   ibex_soc/index
    usb/index
    tools/index
 

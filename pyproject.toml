@@ -5,6 +5,7 @@ description = ""
 requires-python = ">=3.8"
 dependencies = [
     "fusesoc",
+    "edalize-plugins @ git+https://github.com/sjalloq/edalize-plugins.git",
     "migen @ git+https://git.m-labs.hk/M-Labs/migen.git@673e0e8a66600f7e8dcd6345759630474d6b9c80",
     "litex @ git+https://github.com/enjoy-digital/litex.git@2025.08",
     "liteeth @ git+https://github.com/enjoy-digital/liteeth.git@2025.12",

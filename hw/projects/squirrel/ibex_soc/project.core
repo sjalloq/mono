@@ -1,16 +1,16 @@
 CAPI=2:
-name: mono:projects:squirrel_ibex_soc:0.1.0
+name: mono:projects:squirrel_ibex_soc
 description: Ibex RISC-V SoC for Squirrel/CaptainDMA board
 
 filesets:
   rtl:
-    files:
-      - rtl/squirrel_ibex_top.sv
-    file_type: systemVerilogSource
     depend:
       - mono:ip:mmcm
       - mono:ip:ibex_soc
       # - mono:ip:ft601  # Commented out until USB bridge path is implemented
+    files:
+      - rtl/squirrel_ibex_top.sv
+    file_type: systemVerilogSource
 
   board:
     depend:
@@ -22,6 +22,11 @@ filesets:
     files:
       - pins.yaml: { copyto: pins.yaml }
     file_type: user
+
+  verilator_waivers:
+    files:
+      - lint/verilator.vlt
+    file_type: vlt
 
 parameters:
   ItcmInitFile:
@@ -43,7 +48,7 @@ generate:
       output: squirrel_ibex.xdc
 
 targets:
-  default:
+  default: &default
     filesets: [rtl, board]
     toplevel: squirrel_ibex_top
     parameters:
@@ -71,7 +76,9 @@ targets:
 
   lint:
     default_tool: verilator
-    filesets: [rtl]
+    filesets:
+      - rtl
+      - "tool_verilator ? (verilator_waivers)"
     toplevel: squirrel_ibex_top
     tools:
       verilator:
@@ -81,7 +88,9 @@ targets:
 
   sim:
     default_tool: verilator
-    filesets: [rtl]
+    filesets:
+      - rtl
+      - "tool_verilator ? (verilator_waivers)"
     toplevel: squirrel_ibex_top
     parameters:
       - ItcmInitFile
@@ -91,3 +100,9 @@ targets:
         verilator_options:
           - --trace
           - --trace-fst
+
+  flist:
+    <<: *default
+    flow: generic
+    flow_options:
+      tool: flist

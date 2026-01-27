@@ -6,14 +6,13 @@
 |---|------|--------|-------|
 | 1 | Ibex CPU integration | ✅ Done | Debug stubbed, `third_party/ibex` submodule |
 | 2 | FT601 PHY | ✅ Done | Pure SV at `hw/ip/usb/ft601/` |
-| 3 | WB pipelined-to-classic bridge | ⏳ Pending | For CSR peripheral bus |
-| 4 | SimCtrl peripheral | ⏳ Pending | Printf output + sim halt for Verilator |
-| 5 | DPI backdoor for TCM | ⏳ Pending | Program loading + test stimulus |
-| 6 | C toolchain (linker + crt0) | ⏳ Pending | Minimal bringup |
-| 7 | Hello world test | ⏳ Pending | Validate RTL in simulation |
-| 8 | Hardware bringup | ⏳ Pending | Squirrel board |
-| 9 | SystemRDL registers | ⏳ Pending | Future: proper CSR generation |
-| 10 | Rust/Embassy support | ⏳ Pending | Future: depends on SystemRDL |
+| 3 | SimCtrl peripheral | ✅ Done | Printf output + sim halt for Verilator |
+| 4 | DPI backdoor for TCM | ✅ Done | Program loading + test stimulus |
+| 5 | C toolchain (linker + crt0) | ✅ Done | Minimal bringup, SimCtrl integrated |
+| 6 | Hello world test | ⏳ Pending | Validate RTL in simulation |
+| 7 | Hardware bringup | ⏳ Pending | Squirrel board |
+| 8 | SystemRDL registers | ⏳ Pending | Future: proper CSR generation |
+| 9 | Rust/Embassy support | ⏳ Pending | Future: depends on SystemRDL |
 
 ---
 
@@ -29,8 +28,10 @@
 | OBI-to-WB Bridge | `hw/ip/cpu/ibex/rtl/ibex_obi2wb.sv` |
 | Ibex WB Wrapper | `hw/ip/cpu/ibex/rtl/ibex_wb_top.sv` |
 | FT601 PHY | `hw/ip/usb/ft601/rtl/ft601_sync.sv` |
+| SimCtrl | `hw/ip/sim/sim_ctrl/rtl/wb_sim_ctrl.sv` |
 | SoC Top Level | `hw/ip/soc/ibex_soc/rtl/ibex_soc_top.sv` |
 | Board Top Level | `hw/projects/squirrel/ibex_soc/rtl/squirrel_ibex_top.sv` |
+| C Toolchain | `sw/device/ibex_soc/` (linker, crt0, HAL) |
 
 ## Architecture
 
@@ -50,17 +51,17 @@
 │       │  Master 0 │  Master 1     │ Master 2               │
 │       ▼           ▼               ▼                        │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │                     wb_crossbar (3x3)                │  │
+│  │                     wb_crossbar (3x4)                │  │
 │  │                  Priority: ibus > dbus > eb          │  │
-│  └──────┬─────────────────┬─────────────────┬───────────┘  │
-│         │                 │                 │              │
-│     Slave 0           Slave 1           Slave 2            │
-│         │                 │                 │              │
-│         ▼                 ▼                 ▼              │
-│  ┌──────────┐ ┌─────────┐ ┌───────┐                        │
-│  │   ITCM   │ │   DTCM  │ │ Timer │                        │
-│  │  16KB    │ │  16KB   │ │       │                        │
-│  └──────────┘ └─────────┘ └───────┘                        │
+│  └──────┬─────────────────┬────────────┬────────┬───────┘  │
+│         │                 │            │        │          │
+│     Slave 0           Slave 1      Slave 2   Slave 3       │
+│         │                 │            │        │          │
+│         ▼                 ▼            ▼        ▼          │
+│  ┌──────────┐ ┌─────────┐ ┌───────┐ ┌─────────┐            │
+│  │   ITCM   │ │   DTCM  │ │ Timer │ │ SimCtrl │            │
+│  │  16KB    │ │  16KB   │ │       │ │         │            │
+│  └──────────┘ └─────────┘ └───────┘ └─────────┘            │
 │                                                            │
 └────────────────────────────────────────────────────────────┘
 ```
@@ -76,112 +77,111 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 | ITCM | `0x0001_0000` | 16KB | Instruction memory |
 | DTCM | `0x0002_0000` | 16KB | Data memory |
 | Timer | `0x1000_0000` | 4KB | RISC-V timer |
+| SimCtrl | `0x1000_1000` | 4KB | Simulation control (printf + halt) |
 
 ---
 
-## Task 3: WB Pipelined-to-Classic Bridge
-
-**Scope:** Convert pipelined WB to classic 2-cycle WB for simple peripherals
-
-**Purpose:** Allow CSR peripherals to use simpler classic WB interface while main crossbar uses pipelined WB for high-throughput DMA.
-
-**Interface:**
-- Slave side: WB pipelined (stall-based flow control)
-- Master side: WB classic (cyc+stb held until ack, no stall)
-
-**Behavior:**
-- Accept pipelined request, hold request on classic side until ack
-- Assert stall on slave side while classic transaction in progress
-- Single outstanding transaction (no pipelining on classic side)
-
-**Files:**
-- `hw/ip/bus/wb_p2c/rtl/wb_pipelined_to_classic.sv` (new)
-
----
-
-## Task 4: SimCtrl Peripheral
+## Task 3: SimCtrl Peripheral (DONE)
 
 **Scope:** Simulation control peripheral for Verilator tests (like Ibex's `simulator_ctrl.sv`)
 
 **Registers:**
-- `SIM_OUT` (0x00): Write ASCII char → DPI call to print
-- `SIM_CTRL` (0x04): Write 1 to halt simulation
+- `SIM_OUT` (0x00): Write ASCII char [7:0] → `$fwrite` to log file
+- `SIM_CTRL` (0x08): Write 1 to bit 0 → `$finish` after 2-cycle delay
 
 **Features:**
-- DPI functions for character output
-- Simulation termination flag/`$finish`
-- Classic WB interface (sits behind p2c bridge)
+- Character output via `$fwrite` to configurable log file (default: `sim_out.log`)
+- Optional flush on every character for real-time monitoring
+- Simulation termination with delay to allow final transactions
+- Wishbone pipelined interface (stall=0, single-cycle response)
+- Synthesis stub: responds to bus but no functionality
 
 **Files:**
-- `hw/ip/sim/sim_ctrl/rtl/sim_ctrl.sv` (new)
+- `hw/ip/sim/sim_ctrl/rtl/wb_sim_ctrl.sv`
+- `hw/ip/sim/sim_ctrl/sim_ctrl.core`
 
 **Reference:** `third_party/ibex/shared/rtl/sim/simulator_ctrl.sv`
 
 ---
 
-## Task 5: DPI Backdoor for TCM
+## Task 4: DPI Backdoor for TCM (DONE)
 
 **Scope:** Add DPI backdoor functions to TCM for Verilator test stimulus injection
 
-**Approach (like Ibex):**
-- Include `prim_util_memload.svh` equivalent in `wb_tcm.sv`
-- Export `simutil_set_mem` / `simutil_get_mem` DPI functions
-- C++ testbench uses `svSetScope()` + DPI calls for direct array access
+**Approach:** Include `prim_util_memload.svh` from Ibex via FuseSoC dependency
+
+**DPI Functions (provided by prim_util_memload.svh):**
+- `simutil_memload(file)` - Load VMEM file via `$readmemh`
+- `simutil_set_mem(index, val)` - Backdoor write single word
+- `simutil_get_mem(index, val)` - Backdoor read single word
 
 **Usage:**
+- C++ testbench uses `svSetScope()` to select ITCM or DTCM instance
 - Load ELF/VMEM into ITCM before simulation starts
 - Inject test data into DTCM during tests
 - Read back results without bus transactions
+- Use `+show_mem_paths` plusarg to print hierarchical paths
 
 **Files:**
-- `hw/ip/mem/tcm/rtl/wb_tcm.sv` (modify)
-- `hw/dv/verilator/memutil.svh` (new, or reuse Ibex's)
+- `hw/ip/mem/tcm/rtl/wb_tcm.sv` - Added include and parameter aliases
+- `hw/ip/mem/tcm/tcm.core` - Added `lowrisc:prim:util_memload` dependency
 
 **Reference:** `third_party/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_util_memload.svh`
 
 ---
 
-## Task 6: C Toolchain (Linker + crt0)
+## Task 5: C Toolchain (Linker + crt0) (DONE)
 
 **Scope:** Minimal C runtime for hardware validation
 
 **Subtasks:**
-1. Create linker script for TCM memory layout
-2. Create crt0.S startup code (zero regs, init stack, clear BSS, call main)
-3. Vector table with reset at 0x80
+1. Integrate SimCtrl into SoC (add to memory map and instantiate)
+2. Create linker script for TCM memory layout
+3. Create crt0.S startup code (zero regs, init stack, copy .data, clear BSS, call main)
+4. Create minimal HAL (putchar, puts, puthex, sim_halt, timer functions)
+5. Vector table with reset at 0x80
 
 **Memory layout:**
 - ITCM: 0x0001_0000, 16KB (code + rodata)
 - DTCM: 0x0002_0000, 16KB (data + bss + stack)
 
 **Files:**
-- `sw/device/common/link.ld` (new)
-- `sw/device/common/crt0.S` (new)
+- `sw/device/ibex_soc/link.ld` - Linker script
+- `sw/device/ibex_soc/crt0.S` - Startup code
+- `sw/device/ibex_soc/common.mk` - Shared Makefile
+- `sw/device/ibex_soc/lib/ibex_soc_regs.h` - Register definitions
+- `sw/device/ibex_soc/lib/ibex_soc.h` - HAL header
+- `sw/device/ibex_soc/lib/ibex_soc.c` - HAL implementation
+
+**Toolchain:** lowRISC prebuilt from https://github.com/lowRISC/lowrisc-toolchains/releases
 
 **Reference:** `third_party/ibex/examples/sw/simple_system/common/`
 
 ---
 
-## Task 7: Hello World Test
+## Task 6: Hello World Test
 
 **Scope:** Minimal C program to validate toolchain and RTL in simulation
 
 **Behavior:**
-- Write to SimCtrl to print "Hello"
-- Loop with timer delay
+- Write to SimCtrl to print "Hello from ibex_soc!"
+- Print memory map info
+- Read and print timer value
 - Halt simulation
 
 **Files:**
-- `sw/device/squirrel/ibex_soc/hello/main.c` (new)
-- `sw/device/squirrel/ibex_soc/hello/Makefile` (new)
+- `sw/device/squirrel/ibex_soc/hello/main.c`
+- `sw/device/squirrel/ibex_soc/hello/Makefile`
+
+**Build:** `make -C sw/device/squirrel/ibex_soc/hello`
 
 **Toolchain:** `riscv32-unknown-elf-gcc` with `-march=rv32imc -mabi=ilp32`
 
-**Dependencies:** Tasks 4, 5, 6
+**Dependencies:** Tasks 3, 4, 5
 
 ---
 
-## Task 8: Hardware Bringup
+## Task 7: Hardware Bringup
 
 **Scope:** First hardware test on Squirrel board
 
@@ -191,11 +191,11 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 3. Verify CPU running (LED blink or UART output)
 4. Document bringup procedure
 
-**Dependencies:** Task 7 (validated in simulation first)
+**Dependencies:** Task 6 (validated in simulation first)
 
 ---
 
-## Task 9: SystemRDL Register Infrastructure (Future)
+## Task 8: SystemRDL Register Infrastructure (Future)
 
 **Scope:** Set up register generation from SystemRDL
 
@@ -211,7 +211,7 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 
 ---
 
-## Task 10: Rust/Embassy Support (Future)
+## Task 9: Rust/Embassy Support (Future)
 
 **Scope:** Rust toolchain with Embassy async runtime
 
@@ -228,32 +228,31 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 - `sw/rust/ibex-rt/`
 - `sw/rust/apps/hello-embassy/`
 
-**Dependencies:** Task 9 (SystemRDL)
+**Dependencies:** Task 8 (SystemRDL)
 
 ---
 
 ## Dependency Graph
 
 ```
-Task 3 (WB p2c) ─┬─► Task 4 (SimCtrl) ─┬─► Task 7 (Hello) ─► Task 8 (Bringup)
-                 │                      │
-Task 5 (DPI) ────┘                      │
-                                        │
-Task 6 (C toolchain) ───────────────────┘
+Task 3 (SimCtrl) ───┬─► Task 6 (Hello) ─► Task 7 (Bringup)
+                    │
+Task 4 (DPI) ───────┤
+                    │
+Task 5 (C toolchain)┘
 
-Task 9 (SystemRDL) ─► Task 10 (Rust)
+Task 8 (SystemRDL) ─► Task 9 (Rust)
 ```
 
 ## Suggested Order
 
-1. **Task 3** - WB p2c bridge (enables simple peripherals)
-2. **Task 4** - SimCtrl peripheral (printf for debug)
-3. **Task 5** - DPI backdoor (program loading)
-4. **Task 6** - Linker + crt0 (C runtime)
-5. **Task 7** - Hello world (validate in sim)
-6. **Task 8** - Hardware bringup
-7. **Task 9** - SystemRDL (future)
-8. **Task 10** - Rust support (future)
+1. **Task 3** - SimCtrl peripheral (printf for debug)
+2. **Task 4** - DPI backdoor (program loading)
+3. **Task 5** - Linker + crt0 (C runtime)
+4. **Task 6** - Hello world (validate in sim)
+5. **Task 7** - Hardware bringup
+6. **Task 8** - SystemRDL (future)
+7. **Task 9** - Rust support (future)
 
 ---
 
@@ -267,6 +266,92 @@ Task 9 (SystemRDL) ─► Task 10 (Rust)
 ---
 
 ## Work Log
+
+### 2026-01-26: C Toolchain and SimCtrl Integration
+
+**Work completed:**
+- Integrated SimCtrl peripheral into ibex_soc (slave 3 at 0x1000_1000)
+- Created C toolchain for ibex_soc bringup
+- Created hello world test program
+
+**RTL changes:**
+- `ibex_soc_pkg.sv`: Added SimCtrl to memory map (NumSlaves 3→4)
+- `ibex_soc_top.sv`: Instantiated wb_sim_ctrl
+- `ibex_soc.core`: Added mono:ip:sim_ctrl dependency
+- `lint/verilator.vlt`: Added waivers for sim_ctrl unused signal bits
+
+**SW files created:**
+- `sw/device/ibex_soc/link.ld` - Linker script (ITCM for code, DTCM for data/stack)
+- `sw/device/ibex_soc/crt0.S` - Startup code (vector table, register init, .data copy, BSS clear)
+- `sw/device/ibex_soc/common.mk` - Shared Makefile for apps
+- `sw/device/ibex_soc/lib/ibex_soc_regs.h` - Register definitions (for C and asm)
+- `sw/device/ibex_soc/lib/ibex_soc.h` - HAL header
+- `sw/device/ibex_soc/lib/ibex_soc.c` - HAL implementation (putchar, puts, puthex, sim_halt, timer)
+- `sw/device/squirrel/ibex_soc/hello/main.c` - Hello world test
+- `sw/device/squirrel/ibex_soc/hello/Makefile` - Test Makefile
+
+**SW directory structure decision:**
+- `sw/device/ibex_soc/` for SoC-specific toolchain (shared across boards)
+- `sw/device/<board>/<soc>/<app>/` for board+SoC-specific apps
+- This C runtime is for bringup only; Rust/Embassy is the long-term target
+
+**Lint status:** PASS
+
+**Next:** Install lowRISC toolchain and build hello world (Task 6)
+
+---
+
+### 2026-01-26: SimCtrl Peripheral and TCM DPI Backdoor
+
+**Work completed:**
+- Created `wb_sim_ctrl.sv` - Wishbone pipelined simulation control peripheral
+- Updated `wb_tcm.sv` - Include `prim_util_memload.svh` from Ibex for DPI backdoor
+- Created FuseSoC core file for sim_ctrl
+- Added lint waivers for expected unused signals
+
+**SimCtrl features:**
+- Register map: 0x00 (SIM_OUT), 0x08 (SIM_CTRL) - matches Ibex spacing
+- Character output via `$fwrite` to configurable log file
+- Simulation halt via `$finish` with 2-cycle delay
+- Synthesis stub (responds to bus but no functionality)
+- Wrapped in `ifdef VERILATOR` / `else` for synthesis
+
+**TCM DPI functions (via lowRISC prim_util_memload.svh):**
+- `simutil_memload(file)` - Load VMEM file via `$readmemh`
+- `simutil_set_mem(index, val)` - Backdoor write single word
+- `simutil_get_mem(index, val)` - Backdoor read single word
+- `+show_mem_paths` plusarg to print hierarchical memory paths
+- Added parameter aliases (Width, MemInitFile) for include compatibility
+
+**Files created:**
+- `hw/ip/sim/sim_ctrl/rtl/wb_sim_ctrl.sv`
+- `hw/ip/sim/sim_ctrl/sim_ctrl.core`
+
+**Files modified:**
+- `hw/ip/mem/tcm/rtl/wb_tcm.sv` - Added include and parameter aliases
+- `hw/ip/mem/tcm/tcm.core` - Added toplevel, lint waiver, `lowrisc:prim:util_memload` dependency
+- `hw/ip/soc/ibex_soc/lint/verilator.vlt` - Added Ibex FPGA regfile waivers
+
+**Lint status:** PASS (sim_ctrl, tcm, ibex_soc)
+
+---
+
+### 2026-01-26: Removed WB Pipelined-to-Classic Bridge Task
+
+**Decision:** Removed Task 3 (WB pipelined-to-classic bridge) from the plan.
+
+**Rationale:**
+- Simple peripherals like SimCtrl can use "trivial pipelined" WB interface (same pattern as `wb_timer.sv`)
+- Just tie `wb_stall_o = 1'b0` and respond with ack one cycle after request
+- The crossbar already handles stall signal routing
+- No need for a bridge when writing fresh RTL - only useful for integrating legacy classic-only IP
+
+**Impact:**
+- Renumbered Tasks 4-10 → Tasks 3-9
+- SimCtrl (now Task 3) has no dependencies
+- Critical path shortened by one task
+
+---
 
 ### 2026-01-25: SoC Cleanup
 

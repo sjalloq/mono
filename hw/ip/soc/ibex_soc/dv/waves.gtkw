@@ -1,0 +1,41 @@
+[*]
+[*] GTKWave Analyzer v3.3.125 (w)1999-2025 BSI
+[*] Tue Jan 27 21:42:02 2026
+[*]
+[dumpfile] "/home/sjalloq/Work/mono/hw/ip/soc/ibex_soc/dv/dump.fst"
+[dumpfile_mtime] "Tue Jan 27 21:37:12 2026"
+[dumpfile_size] 240427
+[savefile] "/home/sjalloq/Work/mono/hw/ip/soc/ibex_soc/dv/waves.gtkw"
+[timestart] 22178900
+[size] 2337 1773
+[pos] -1 -1
+*-16.413876 22844600 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] ibex_soc_top.
+[treeopen] ibex_soc_top.u_cpu.
+[treeopen] ibex_soc_top.u_cpu.u_ibex_core.
+[treeopen] ibex_soc_top.u_cpu.u_ibex_core.u_ibex_core.
+[sst_width] 429
+[signals_width] 301
+[sst_expanded] 1
+[sst_vpaned_height] 565
+@28
+ibex_soc_top.u_cpu.clk_i
+@800200
+-SimCtrl Wishbone
+@28
+ibex_soc_top.u_sim_ctrl.wb_cyc_i
+ibex_soc_top.u_sim_ctrl.wb_stb_i
+ibex_soc_top.u_sim_ctrl.wb_we_i
+@22
+ibex_soc_top.u_sim_ctrl.wb_adr_i[31:0]
+ibex_soc_top.u_sim_ctrl.wb_dat_i[31:0]
+ibex_soc_top.u_sim_ctrl.wb_sel_i[3:0]
+ibex_soc_top.u_sim_ctrl.wb_dat_o[31:0]
+@28
+ibex_soc_top.u_sim_ctrl.wb_ack_o
+@1000200
+-SimCtrl Wishbone
+@22
+ibex_soc_top.u_cpu.u_ibex_core.u_ibex_core.wb_stage_i.pc_id_i[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

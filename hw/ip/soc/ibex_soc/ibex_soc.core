@@ -1,18 +1,19 @@
 CAPI=2:
-name: mono:ip:ibex_soc:0.1.0
+name: mono:ip:ibex_soc
 description: Ibex RISC-V SoC with Wishbone bus and USB Etherbone host interface
 
 filesets:
   rtl:
-    files:
-      - rtl/ibex_soc_pkg.sv
-      - rtl/ibex_soc_top.sv
-    file_type: systemVerilogSource
     depend:
       - mono:ip:ibex_wb
       - mono:ip:wb_crossbar
       - mono:ip:tcm
       - mono:ip:timer
+      - mono:ip:sim_ctrl
+    files:
+      - rtl/ibex_soc_pkg.sv
+      - rtl/ibex_soc_top.sv
+    file_type: systemVerilogSource
 
   verilator_waivers:
     files:
@@ -37,6 +38,7 @@ targets:
     parameters:
       - ItcmInitFile
       - DtcmInitFile
+    toplevel: ibex_soc_top
 
   lint:
     <<: *default
@@ -57,3 +59,13 @@ targets:
         verilator_options:
           - --trace
           - --trace-fst
+
+  flist:
+    <<: *default
+    flow: generic
+    flow_options:
+      tool: flist
+      file_types:
+        - systemVerilogSource
+        - verilogSource
+        - vlt

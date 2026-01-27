@@ -1,0 +1,26 @@
+CAPI=2:
+name: mono:ip:sim_ctrl:0.1.0
+description: Simulation control peripheral with Wishbone pipelined interface
+
+filesets:
+  rtl:
+    files:
+      - rtl/wb_sim_ctrl.sv
+    file_type: systemVerilogSource
+
+targets:
+  default: &default
+    filesets: [rtl]
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    toplevel: wb_sim_ctrl
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+          # Verilator already defines VERILATOR macro
+          # Unused signal bits expected - only using low bits of addr/sel/dat
+          - -Wno-UNUSEDSIGNAL

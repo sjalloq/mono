@@ -4,6 +4,8 @@ description: Tightly Coupled Memory with Wishbone pipelined interface
 
 filesets:
   rtl:
+    depend:
+      - lowrisc:prim:util_memload
     files:
       - rtl/wb_tcm.sv
     file_type: systemVerilogSource
@@ -15,11 +17,14 @@ targets:
   lint:
     <<: *default
     default_tool: verilator
+    toplevel: wb_tcm
     tools:
       verilator:
         mode: lint-only
         verilator_options:
           - -Wall
+          # Upper address bits decoded by crossbar, only local offset used
+          - -Wno-UNUSEDSIGNAL
 
   sim:
     <<: *default

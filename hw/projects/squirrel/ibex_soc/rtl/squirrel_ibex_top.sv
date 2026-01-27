@@ -17,10 +17,7 @@ module squirrel_ibex_top #(
     output logic [1:0]  user_led,
 
     // User switches
-    // verilator lint_off UNUSEDSIGNAL
-    // Justification: user_sw[1] reserved for future use; only [0] used for LED test
     input  logic [1:0]  user_sw
-    // verilator lint_on UNUSEDSIGNAL
 
     // FT601 USB 3.0 FIFO interface (commented out for initial synthesis)
     // input  logic        usb_fifo_clk,
@@ -129,12 +126,8 @@ module squirrel_ibex_top #(
     logic [31:0] eb_adr, eb_dat_w;
     logic [3:0]  eb_sel;
 
-    // verilator lint_off UNUSEDSIGNAL
-    // Justification: Etherbone response signals unused because request side is tied off.
-    // Will be connected when USB bridge path is implemented.
     logic [31:0] eb_dat_r;
     logic        eb_ack, eb_err, eb_stall;
-    // verilator lint_on UNUSEDSIGNAL
 
     // Placeholder: Tie off Etherbone until USB bridge is implemented
     assign eb_cyc   = '0;

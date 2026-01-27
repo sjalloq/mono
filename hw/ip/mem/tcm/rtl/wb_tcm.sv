@@ -7,10 +7,9 @@
 // Supports optional initialization from hex file.
 
 module wb_tcm #(
-    parameter int unsigned Size      = 16384,  // Size in bytes
-    parameter int unsigned AW        = 32,     // Address width
-    parameter int unsigned DW        = 32,     // Data width
-    parameter string       InitFile  = ""      // Optional hex init file
+    parameter int unsigned Width       = 32,    // Data width in bits
+    parameter int unsigned Depth       = 4096,  // Memory depth in words
+    parameter string       MemInitFile = ""     // Optional hex init file
 ) (
     input  logic             clk_i,
     input  logic             rst_ni,
@@ -19,25 +18,24 @@ module wb_tcm #(
     input  logic             wb_cyc_i,
     input  logic             wb_stb_i,
     input  logic             wb_we_i,
-    input  logic [AW-1:0]    wb_adr_i,   // Byte address
-    input  logic [DW/8-1:0]  wb_sel_i,
-    input  logic [DW-1:0]    wb_dat_i,
-    output logic [DW-1:0]    wb_dat_o,
+    input  logic [31:0]      wb_adr_i,   // Byte address (only lower bits used)
+    input  logic [Width/8-1:0] wb_sel_i,
+    input  logic [Width-1:0] wb_dat_i,
+    output logic [Width-1:0] wb_dat_o,
     output logic             wb_ack_o,
     output logic             wb_err_o,
     output logic             wb_stall_o
 );
 
-    // Internal parameters
-    localparam int unsigned Depth   = Size / (DW / 8);
-    localparam int unsigned AwLocal = $clog2(Depth);
+    // Local address width for word addressing
+    localparam int unsigned Aw = $clog2(Depth);
 
     // Memory array
-    logic [DW-1:0] mem [Depth];
+    logic [Width-1:0] mem [Depth];
 
     // Word address from byte address
-    logic [AwLocal-1:0] word_addr;
-    assign word_addr = wb_adr_i[$clog2(DW/8) +: AwLocal];
+    logic [Aw-1:0] word_addr;
+    assign word_addr = wb_adr_i[$clog2(Width/8) +: Aw];
 
     // Valid access check
     logic valid_access;
@@ -51,11 +49,11 @@ module wb_tcm #(
 
     // Registered outputs
     logic wb_ack_d, wb_ack_q;
-    logic [DW-1:0] wb_dat_d, wb_dat_q;
+    logic [Width-1:0] wb_dat_d, wb_dat_q;
 
     // Memory write enable per byte lane
     logic mem_we;
-    logic [DW-1:0] mem_wdata;
+    logic [Width-1:0] mem_wdata;
 
     // Combinational logic
     always_comb begin
@@ -65,7 +63,7 @@ module wb_tcm #(
         // Memory write data with byte enables
         mem_we = valid_access && wb_we_i;
         mem_wdata = mem[word_addr];
-        for (int i = 0; i < DW/8; i++) begin
+        for (int i = 0; i < Width/8; i++) begin
             if (wb_sel_i[i]) begin
                 mem_wdata[i*8 +: 8] = wb_dat_i[i*8 +: 8];
             end
@@ -94,12 +92,16 @@ module wb_tcm #(
     assign wb_ack_o = wb_ack_q;
     assign wb_dat_o = wb_dat_q;
 
-    // Optional memory initialization
-    initial begin
-        if (InitFile != "") begin
-            $readmemh(InitFile, mem);
-        end
-    end
+    // =========================================================================
+    // Simulation Support (DPI backdoor access)
+    // =========================================================================
+    // Uses lowRISC prim_util_memload.svh for testbench memory access:
+    //   - simutil_memload: Load memory from VMEM file
+    //   - simutil_set_mem: Write single word (backdoor)
+    //   - simutil_get_mem: Read single word (backdoor)
+    // Requires Width, Depth, MemInitFile parameters (aliased above).
+
+    `include "prim_util_memload.svh"
 
 `ifdef FORMAL
     // Formal verification properties

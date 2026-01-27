@@ -26,5 +26,16 @@ lint_off -rule UNUSEDSIGNAL -file "*/wb_tcm.sv" -match "*wb_adr_i*"
 // Timer only uses bits needed for register decode
 lint_off -rule UNUSEDSIGNAL -file "*/wb_timer.sv" -match "*wb_adr_i*"
 
+// SimCtrl only uses bits [3:2] of address for register decode
+// Only uses sel[0] and dat[7:0] for character output
+lint_off -rule UNUSEDSIGNAL -file "*/wb_sim_ctrl.sv" -match "*wb_adr_i*"
+lint_off -rule UNUSEDSIGNAL -file "*/wb_sim_ctrl.sv" -match "*wb_sel_i*"
+lint_off -rule UNUSEDSIGNAL -file "*/wb_sim_ctrl.sv" -match "*wb_dat_i*"
+
 // Width expansions from smaller constants to bus widths are expected
 lint_off -rule WIDTHEXPAND -file "*/ibex_*.sv"
+
+// Ibex FPGA register file: unused signals/params are expected for this variant
+// These are Ibex third-party code issues, not configurable
+lint_off -rule UNUSEDPARAM -file "*/ibex_register_file_fpga.sv"
+lint_off -rule UNUSEDSIGNAL -file "*/ibex_register_file_fpga.sv"
