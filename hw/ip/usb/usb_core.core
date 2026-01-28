@@ -19,7 +19,23 @@ generate:
         clk_freq: 100000000
 
 targets:
-  default:
+  default: &default
     generate: [netlist]
     filesets: [rtl]
     toplevel: usb_core
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    toplevel: usb_core
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+          - -Wno-COMBDLY
+          - -Wno-UNUSEDSIGNAL
+          - -Wno-PROCASSINIT
+          - -Wno-WIDTHTRUNC
+          - -Wno-WIDTHEXPAND
+          - -Wno-INITIALDLY

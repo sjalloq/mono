@@ -28,16 +28,16 @@ same physical USB link.
     |   USB Crossbar   |  Routes packets by channel ID (0-255)
     +------------------+
          |
-    +----+----+----+
+    +----+----+----+----+
     |    |    |    |
     v    v    v    v
    Ch0  Ch1  Ch2  ...   User Ports
-    |    |
-    v    v
-   Etherbone  TLP Monitor
-    |
-    v
-   Wishbone Bus
+    |    |    |
+    v    v    v
+   Etherbone  TLP Monitor  USB UART
+    |                        |
+    v                        v
+   Wishbone Bus           CPU printf/REPL
 
 
 Key Features
@@ -46,6 +46,7 @@ Key Features
 * **Multi-channel architecture**: Up to 256 logical channels over single USB link
 * **Etherbone protocol**: Standard Wishbone access protocol (channel 0)
 * **TLP monitoring**: Non-intrusive PCIe packet capture (channel 1)
+* **USB UART**: CPU printf and REPL over USB (channel 2)
 * **Clock domain crossing**: Automatic CDC between 100MHz USB and system clocks
 * **Extensible**: Easy to add new channel handlers
 
@@ -59,7 +60,9 @@ Channel Allocation
 +---------+-------------+------------------------------------------+
 | 1       | TLP Monitor | PCIe TLP packet streaming                |
 +---------+-------------+------------------------------------------+
-| 2-255   | User        | Available for custom protocols           |
+| 2       | USB UART    | CPU printf output and REPL input         |
++---------+-------------+------------------------------------------+
+| 3-255   | User        | Available for custom protocols           |
 +---------+-------------+------------------------------------------+
 
 

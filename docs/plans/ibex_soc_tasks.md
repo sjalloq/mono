@@ -9,7 +9,7 @@
 | 3 | SimCtrl peripheral | ✅ Done | Printf output + sim halt for Verilator |
 | 4 | DPI backdoor for TCM | ✅ Done | Program loading + test stimulus |
 | 5 | C toolchain (linker + crt0) | ✅ Done | Minimal bringup, SimCtrl integrated |
-| 6 | Hello world test | ⏳ Pending | Validate RTL in simulation |
+| 6 | Hello world test | ✅ Done | Cocotb testbench with Verilator |
 | 7 | Hardware bringup | ⏳ Pending | Squirrel board |
 | 8 | SystemRDL registers | ⏳ Pending | Future: proper CSR generation |
 | 9 | Rust/Embassy support | ⏳ Pending | Future: depends on SystemRDL |
@@ -78,6 +78,7 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 | DTCM | `0x0002_0000` | 16KB | Data memory |
 | Timer | `0x1000_0000` | 4KB | RISC-V timer |
 | SimCtrl | `0x1000_1000` | 4KB | Simulation control (printf + halt) |
+| USB UART | `0x1000_2000` | 4KB | CPU-to-host UART over USB (Channel 2) |
 
 ---
 
@@ -87,12 +88,23 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 
 **Registers:**
 - `SIM_OUT` (0x00): Write ASCII char [7:0] → `$fwrite` to log file
-- `SIM_CTRL` (0x08): Write 1 to bit 0 → `$finish` after 2-cycle delay
+- `SIM_CTRL` (0x08): Write 1 to bit 0 → halt simulation
+
+**Parameters:**
+- `LogName` - Log file path (default: `sim_out.log`)
+- `FlushOnChar` - Flush log on every character (default: 1)
+- `UseFinish` - Use `$finish` to terminate (default: 0 for Cocotb compatibility)
+
+**Output signals (for Cocotb observability):**
+- `sim_halt_o` - High when software requests halt
+- `char_valid_o` - Pulse when character written
+- `char_data_o` - Character value [7:0]
 
 **Features:**
-- Character output via `$fwrite` to configurable log file (default: `sim_out.log`)
+- Character output via `$fwrite` to configurable log file
 - Optional flush on every character for real-time monitoring
 - Simulation termination with delay to allow final transactions
+- Cocotb-compatible: testbench monitors `sim_halt_o` instead of relying on `$finish`
 - Wishbone pipelined interface (stall=0, single-cycle response)
 - Synthesis stub: responds to bus but no functionality
 
@@ -159,7 +171,7 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 
 ---
 
-## Task 6: Hello World Test
+## Task 6: Hello World Test (DONE)
 
 **Scope:** Minimal C program to validate toolchain and RTL in simulation
 
@@ -169,11 +181,18 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 - Read and print timer value
 - Halt simulation
 
-**Files:**
+**C program files:**
 - `sw/device/squirrel/ibex_soc/hello/main.c`
 - `sw/device/squirrel/ibex_soc/hello/Makefile`
 
-**Build:** `make -C sw/device/squirrel/ibex_soc/hello`
+**Cocotb testbench files:**
+- `hw/ip/soc/ibex_soc/dv/Makefile` - Cocotb/Verilator Makefile
+- `hw/ip/soc/ibex_soc/dv/testbench.py` - Cocotb test module
+- `hw/ip/soc/ibex_soc/dv/filelist.f` - Generated file list
+
+**Build firmware:** `make -C sw/device/squirrel/ibex_soc/hello`
+
+**Run test:** `cd hw/ip/soc/ibex_soc/dv && make`
 
 **Toolchain:** `riscv32-unknown-elf-gcc` with `-march=rv32imc -mabi=ilp32`
 
@@ -183,15 +202,66 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 
 ## Task 7: Hardware Bringup
 
-**Scope:** First hardware test on Squirrel board
+**Scope:** First hardware test on Squirrel board with USB communication
 
-**Subtasks:**
-1. Synthesize and generate bitstream
-2. Load via JTAG/SPI
-3. Verify CPU running (LED blink or UART output)
-4. Document bringup procedure
+### Phase 1: USB Core Integration
+
+**7.1 USB Core via Migen Generator**
+- Use FuseSoC migen_netlister to generate USB core Verilog
+- USB Packetizer/Depacketizer + Crossbar from existing LiteX code
+- Integrate FT601 PHY with USB core
+
+**7.2 USB UART Peripheral (Channel 2)**
+- Create SystemRDL: `docs/rdl/usb_uart.rdl`
+- Generate CSR block with PeakRDL-sv
+- Implement `wb_usb_uart.sv`:
+  - Wishbone slave via wb2simple adapter
+  - TX FIFO with newline detection and timer flush
+  - RX FIFO with packet length tracking
+  - Stream interface to USB crossbar
+- Spec: `docs/source/usb/usb_uart.rst`
+
+**7.3 SoC Integration**
+- Add USB UART to crossbar (Slave 4 at `0x1000_2000`)
+- Connect USB core stream interfaces
+- Update ibex_soc_pkg.sv memory map
+- Tie off SimCtrl in synthesis (keep for simulation)
+
+**7.4 HAL Update**
+- Add USB UART driver to `sw/device/ibex_soc/lib/`
+- Modify putchar() to use USB UART when not in simulation
+- Add readline() for REPL input
+
+### Phase 2: Host Software
+
+**7.5 Channel Multiplexer**
+- Rust server to demux USB channels to endpoints
+- Channel 0: Etherbone (existing)
+- Channel 2: USB UART → PTY or TCP socket
+
+**7.6 REPL Test**
+- Simple command parser in firmware
+- Verify bidirectional communication
+
+### Phase 3: Synthesis
+
+**7.7 Bitstream Generation**
+- Synthesize with Vivado
+- Generate programming files
+
+**7.8 Hardware Test**
+- Load bitstream via JTAG/SPI
+- Verify printf output via USB UART
+- Test REPL commands
+- Document bringup procedure
 
 **Dependencies:** Task 6 (validated in simulation first)
+
+**Files:**
+- `docs/rdl/usb_uart.rdl` - SystemRDL register definition
+- `hw/ip/usb/usb_uart/rtl/wb_usb_uart.sv` - USB UART peripheral
+- `hw/ip/usb/usb_uart/usb_uart.core` - FuseSoC core file
+- `sw/device/ibex_soc/lib/usb_uart.c` - HAL driver
 
 ---
 
@@ -258,6 +328,7 @@ Task 8 (SystemRDL) ─► Task 9 (Rust)
 
 ## Related Documentation
 
+- USB subsystem: `docs/source/usb/` (FT601, protocol, Etherbone, USB UART)
 - Debug options: `docs/plans/ibex_debug_options.md`
 - XDC generator: `docs/guides/xdc_generator.md`
 - Verilog coding guidelines: `docs/guides/verilog/`
@@ -266,6 +337,64 @@ Task 8 (SystemRDL) ─► Task 9 (Rust)
 ---
 
 ## Work Log
+
+### 2026-01-27: USB UART Channel Specification
+
+**Work completed:**
+- Created functional specification for USB UART (Channel 2)
+- Designed register interface compatible with PeakRDL-sv CSR generation
+- Documented TX path with newline detection and timer-based flush
+- Documented RX path with packet length tracking for REPL input
+
+**Design decisions:**
+- 32-bit word interface (no byte writes) for efficient bulk transfers
+- Auto-flush on newline (`\n`) for interactive printf
+- Timer-based flush for partial lines (default 1ms timeout)
+- Separate address from SimCtrl (`0x1000_2000`) - SimCtrl kept for simulation
+- Uses existing CSR infrastructure (`hw/ip/csr/`) with wb2simple adapter
+
+**Files created:**
+- `docs/source/usb/usb_uart.rst` - Full specification with register map and SW examples
+
+**Files modified:**
+- `docs/source/usb/index.rst` - Added usb_uart to toctree
+- `docs/source/usb/overview.rst` - Updated channel allocation table and architecture diagram
+- `docs/plans/ibex_soc_tasks.md` - Expanded Task 7 with USB UART subtasks, updated memory map
+
+**Next:** Create SystemRDL file and implement wb_usb_uart.sv
+
+---
+
+### 2026-01-27: Cocotb Testbench and SimCtrl Cocotb Integration
+
+**Work completed:**
+- Created Cocotb testbench for ibex_soc hello world validation
+- Enhanced wb_sim_ctrl.sv with output signals for Cocotb observability
+- Test passes: CPU boots, runs hello world, halts cleanly
+
+**SimCtrl enhancements for Cocotb:**
+- Added `UseFinish` parameter (default 0) - disables `$finish` for Cocotb compatibility
+- Added `sim_halt_o` output - goes high when software requests simulation halt
+- Added `char_valid_o` / `char_data_o` outputs - pulses when character written
+- Cocotb can now monitor these signals instead of relying on `$finish` (which causes test failure)
+
+**Files created:**
+- `hw/ip/soc/ibex_soc/dv/Makefile` - Cocotb Makefile for Verilator
+- `hw/ip/soc/ibex_soc/dv/testbench.py` - Cocotb test module
+- `hw/ip/soc/ibex_soc/dv/filelist.f` - Generated via `flist` tool
+
+**Files modified:**
+- `hw/ip/sim/sim_ctrl/rtl/wb_sim_ctrl.sv` - Added Cocotb-friendly outputs and UseFinish parameter
+- `hw/ip/soc/ibex_soc/rtl/ibex_soc_top.sv` - Added sim_halt_o, sim_char_valid_o, sim_char_data_o ports
+
+**Cocotb test pattern:**
+- Monitor `sim_char_valid_o` to capture printf output
+- Wait on `RisingEdge(dut.sim_halt_o)` instead of `$finish`
+- Test completes cleanly without simulator killing itself
+
+**Next:** Task 7 - Hardware bringup on Squirrel board
+
+---
 
 ### 2026-01-26: C Toolchain and SimCtrl Integration
 

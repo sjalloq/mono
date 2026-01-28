@@ -1,0 +1,202 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// USB UART CSR Definition
+//
+// Copyright (c) 2025-2026 Shareef Jalloq
+//
+// SystemRDL register definitions for the USB UART.
+// Regenerate SV: source sourceme && make -C hw/ip/usb_uart/rdl
+
+addrmap usb_uart_csr {
+    name = "USB UART CSRs";
+    desc = "Bidirectional character stream over USB for CPU debug I/O";
+
+    default regwidth = 32;
+
+    // =========================================================================
+    // TX_DATA - Write data to TX FIFO (write-only, external)
+    // =========================================================================
+    reg tx_data_reg {
+        name = "TX Data";
+        desc = "Write 32-bit word to TX FIFO. Hardware scans for newline to trigger flush.";
+
+        field {
+            sw = w;
+            hw = r;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // RX_DATA - Read data from RX FIFO (read-only, external)
+    // =========================================================================
+    reg rx_data_reg {
+        name = "RX Data";
+        desc = "Read 32-bit word from RX Data FIFO. Each read pops one word.";
+
+        field {
+            sw = r;
+            hw = w;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // RX_LEN - Current packet byte count (read-only, external)
+    // =========================================================================
+    reg rx_len_reg {
+        name = "RX Length";
+        desc = "Byte count of current RX packet from Len FIFO. Zero means no complete packet available.";
+
+        field {
+            sw = r;
+            hw = w;
+        } len[31:0] = 0;
+    };
+
+    // =========================================================================
+    // STATUS - FIFO status flags (read-only from SW, written by HW)
+    // =========================================================================
+    reg status_reg {
+        name = "Status";
+        desc = "FIFO status flags";
+
+        field {
+            desc = "TX FIFO empty";
+            sw = r;
+            hw = w;
+        } tx_empty[0:0] = 1;
+
+        field {
+            desc = "TX FIFO full";
+            sw = r;
+            hw = w;
+        } tx_full[1:1] = 0;
+
+        field {
+            desc = "RX packet available (Len FIFO not empty)";
+            sw = r;
+            hw = w;
+        } rx_valid[2:2] = 0;
+
+        field {
+            desc = "RX Data FIFO full (backpressure to USB)";
+            sw = r;
+            hw = w;
+        } rx_full[3:3] = 0;
+
+        field {
+            desc = "TX FIFO level (words)";
+            sw = r;
+            hw = w;
+        } tx_level[7:4] = 0;
+
+        field {
+            desc = "RX packets queued (Len FIFO level)";
+            sw = r;
+            hw = w;
+        } rx_packets[11:8] = 0;
+    };
+
+    // =========================================================================
+    // CTRL - Control register
+    // =========================================================================
+    reg ctrl_reg {
+        name = "Control";
+        desc = "UART control register";
+
+        field {
+            desc = "TX enable";
+            sw = rw;
+            hw = r;
+        } tx_en[0:0] = 1;
+
+        field {
+            desc = "RX enable";
+            sw = rw;
+            hw = r;
+        } rx_en[1:1] = 1;
+
+        field {
+            desc = "Auto-flush on newline (0x0A)";
+            sw = rw;
+            hw = r;
+        } nl_flush_en[2:2] = 1;
+
+        field {
+            desc = "Auto-flush on idle timeout";
+            sw = rw;
+            hw = r;
+        } timeout_flush_en[3:3] = 1;
+
+        field {
+            desc = "Auto-flush on threshold";
+            sw = rw;
+            hw = r;
+        } thresh_flush_en[4:4] = 0;
+
+        field {
+            desc = "Software TX flush (write-1-to-trigger)";
+            sw = rw;
+            hw = r;
+            singlepulse;
+        } tx_flush[5:5] = 0;
+
+        field {
+            desc = "Software RX flush/clear (write-1-to-trigger)";
+            sw = rw;
+            hw = r;
+            singlepulse;
+        } rx_flush[6:6] = 0;
+
+        field {
+            desc = "IRQ enable: RX packet available";
+            sw = rw;
+            hw = r;
+        } irq_rx_en[8:8] = 0;
+
+        field {
+            desc = "IRQ enable: TX FIFO empty";
+            sw = rw;
+            hw = r;
+        } irq_tx_empty_en[9:9] = 0;
+    };
+
+    // =========================================================================
+    // TIMEOUT - Idle flush timeout
+    // =========================================================================
+    reg timeout_reg {
+        name = "Timeout";
+        desc = "Idle timeout in clock cycles for auto-flush";
+
+        field {
+            sw = rw;
+            hw = r;
+        } cycles[31:0] = 100000;  // ~1ms at 100MHz
+    };
+
+    // =========================================================================
+    // THRESH - TX flush threshold
+    // =========================================================================
+    reg thresh_reg {
+        name = "Threshold";
+        desc = "TX FIFO level threshold for flush trigger (words)";
+
+        field {
+            sw = rw;
+            hw = r;
+        } thresh[7:0] = 8;
+    };
+
+    // =========================================================================
+    // Register instantiation
+    // =========================================================================
+
+    // External registers: value comes from/goes to hardware directly
+    external tx_data_reg  tx_data  @ 0x00;
+    external rx_data_reg  rx_data  @ 0x04;
+    external rx_len_reg   rx_len   @ 0x08;
+
+    // Internal registers: PeakRDL generates storage
+    status_reg            status   @ 0x0C;
+    ctrl_reg              ctrl     @ 0x10;
+    timeout_reg           timeout  @ 0x14;
+    thresh_reg            thresh   @ 0x18;
+};

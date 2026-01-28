@@ -16,6 +16,7 @@ to any channel.
    ft601_phy
    usb_protocol
    etherbone
+   usb_uart
    monitor
    software
    sv_conversion
