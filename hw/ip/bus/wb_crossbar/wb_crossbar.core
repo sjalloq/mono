@@ -4,6 +4,8 @@ description: Wishbone B4 pipelined crossbar interconnect
 
 filesets:
   rtl:
+    depend:
+      - mono:ip:wb_pkg
     files:
       - rtl/wb_crossbar_pkg.sv
       - rtl/wb_crossbar_decoder.sv

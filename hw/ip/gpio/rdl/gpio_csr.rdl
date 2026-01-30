@@ -1,0 +1,137 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// GPIO CSR Definition
+//
+// Copyright (c) 2025-2026 Shareef Jalloq
+//
+// SystemRDL register definitions for the GPIO peripheral.
+// Regenerate SV: source sourceme && make -C hw/ip/gpio/rdl
+
+addrmap gpio_csr {
+    name = "GPIO CSRs";
+    desc = "General Purpose I/O with per-bit atomic operations and interrupts";
+
+    default regwidth = 32;
+
+    // =========================================================================
+    // GPIO_OUT - Output data (external - storage in custom RTL)
+    // =========================================================================
+    reg gpio_out_reg {
+        name = "GPIO Output";
+        desc = "Output data register. Storage managed in custom RTL for atomic SET/CLR/TOGGLE support.";
+
+        field {
+            sw = rw;
+            hw = rw;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // GPIO_OE - Output enable
+    // =========================================================================
+    reg gpio_oe_reg {
+        name = "GPIO Output Enable";
+        desc = "Output enable per pin (1=output, 0=input).";
+
+        field {
+            sw = rw;
+            hw = r;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // GPIO_IN - Input data (external - synchronized from pins)
+    // =========================================================================
+    reg gpio_in_reg {
+        name = "GPIO Input";
+        desc = "Synchronized input pin values. Read-only passthrough from pins.";
+
+        field {
+            sw = r;
+            hw = w;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // GPIO_IE - Input enable
+    // =========================================================================
+    reg gpio_ie_reg {
+        name = "GPIO Input Enable";
+        desc = "Input enable per pin (1=enabled, 0=disabled).";
+
+        field {
+            sw = rw;
+            hw = r;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // IRQ_STATUS - Sticky IRQ flags (W1C)
+    // =========================================================================
+    reg irq_status_reg {
+        name = "IRQ Status";
+        desc = "Sticky interrupt event flags. HW sets on event. SW clears by writing 1.";
+
+        field {
+            desc = "Per-pin interrupt status";
+            sw = rw;
+            hw = rw;
+            onwrite = woclr;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // IRQ_ENABLE - IRQ enable mask
+    // =========================================================================
+    reg irq_enable_reg {
+        name = "IRQ Enable";
+        desc = "Enable mask for interrupt sources. irq_o = |(irq_status & irq_enable).";
+
+        field {
+            desc = "Per-pin interrupt enable";
+            sw = rw;
+            hw = r;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // IRQ_EDGE - Edge polarity
+    // =========================================================================
+    reg irq_edge_reg {
+        name = "IRQ Edge";
+        desc = "Edge polarity per pin (1=rising/active-high, 0=falling/active-low).";
+
+        field {
+            sw = rw;
+            hw = r;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // IRQ_TYPE - Interrupt type
+    // =========================================================================
+    reg irq_type_reg {
+        name = "IRQ Type";
+        desc = "Interrupt type per pin (1=edge, 0=level).";
+
+        field {
+            sw = rw;
+            hw = r;
+        } data[31:0] = 0;
+    };
+
+    // =========================================================================
+    // Register instantiation
+    // =========================================================================
+
+    // External registers: value comes from/goes to hardware directly
+    external gpio_out_reg  gpio_out   @ 0x00;
+    external gpio_in_reg   gpio_in    @ 0x08;
+
+    // Internal registers: PeakRDL generates storage
+    gpio_oe_reg            gpio_oe    @ 0x04;
+    gpio_ie_reg            gpio_ie    @ 0x0C;
+    irq_status_reg         irq_status @ 0x10;
+    irq_enable_reg         irq_enable @ 0x14;
+    irq_edge_reg           irq_edge   @ 0x18;
+    irq_type_reg           irq_type   @ 0x1C;
+};

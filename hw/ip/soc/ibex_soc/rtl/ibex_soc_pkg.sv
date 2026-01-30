@@ -11,23 +11,36 @@ package ibex_soc_pkg;
     parameter int unsigned AddrWidth = 32;
     parameter int unsigned DataWidth = 32;
 
-    // Number of masters and slaves
+    // Number of masters
     parameter int unsigned NumMasters = 3;  // I-bus, D-bus, Etherbone
-    parameter int unsigned NumSlaves  = 4;  // ITCM, DTCM, Timer, SimCtrl
 
     // Master indices
     parameter int unsigned MasterIbus = 0;
     parameter int unsigned MasterDbus = 1;
     parameter int unsigned MasterEb   = 2;
 
-    // Slave indices
-    parameter int unsigned SlaveItcm    = 0;
-    parameter int unsigned SlaveDtcm    = 1;
-    parameter int unsigned SlaveTimer   = 2;
-    parameter int unsigned SlaveSimCtrl = 3;
+    // Memory slaves (configurable base + mask)
+    parameter int unsigned NumMemSlaves = 2;    // ITCM, DTCM
+    parameter int unsigned SlaveItcm = 0;
+    parameter int unsigned SlaveDtcm = 1;
 
-    // Memory map
-    // Region: Base address and depth (in words)
+    // Peripheral base (fixed 4K windows from PeriphBase)
+    parameter logic [AddrWidth-1:0] PeriphBase = 32'h1000_0000;
+    parameter logic [AddrWidth-1:0] PeriphMask = 32'hFFFF_F000;
+
+    // Internal peripheral slot indices (relative to PeriphBase)
+    parameter int unsigned NumIntPeriphs = 2;   // Timer, SimCtrl
+    parameter int unsigned PeriphTimer   = 0;
+    parameter int unsigned PeriphSimCtrl = 1;
+
+    // Total internal slaves
+    parameter int unsigned NumIntSlaves = NumMemSlaves + NumIntPeriphs;  // 4
+
+    // Crossbar slave indices (memories first, then peripherals)
+    parameter int unsigned SlaveTimer   = NumMemSlaves + PeriphTimer;    // 2
+    parameter int unsigned SlaveSimCtrl = NumMemSlaves + PeriphSimCtrl;  // 3
+
+    // Memory map: memory slaves (configurable size)
     parameter logic [AddrWidth-1:0] ItcmBase  = 32'h0001_0000;
     parameter int unsigned          ItcmDepth = 4096;  // 16KB (4096 x 32-bit)
     parameter logic [AddrWidth-1:0] ItcmMask  = 32'hFFFF_C000;
@@ -36,13 +49,9 @@ package ibex_soc_pkg;
     parameter int unsigned          DtcmDepth = 4096;  // 16KB (4096 x 32-bit)
     parameter logic [AddrWidth-1:0] DtcmMask  = 32'hFFFF_C000;
 
-    parameter logic [AddrWidth-1:0] TimerBase = 32'h1000_0000;
-    parameter logic [AddrWidth-1:0] TimerSize = 32'h0000_1000;  // 4KB
-    parameter logic [AddrWidth-1:0] TimerMask = 32'hFFFF_F000;
-
-    parameter logic [AddrWidth-1:0] SimCtrlBase = 32'h1000_1000;
-    parameter logic [AddrWidth-1:0] SimCtrlSize = 32'h0000_1000;  // 4KB
-    parameter logic [AddrWidth-1:0] SimCtrlMask = 32'hFFFF_F000;
+    // Derived peripheral base addresses (for HAL/SW headers)
+    parameter logic [AddrWidth-1:0] TimerBase   = PeriphBase + PeriphTimer   * 32'h1000;
+    parameter logic [AddrWidth-1:0] SimCtrlBase = PeriphBase + PeriphSimCtrl * 32'h1000;
 
     // Boot address (start of ITCM)
     parameter logic [AddrWidth-1:0] BootAddr = ItcmBase;
@@ -50,24 +59,5 @@ package ibex_soc_pkg;
     // Debug addresses (within ITCM)
     parameter logic [AddrWidth-1:0] DmHaltAddr = ItcmBase;
     parameter logic [AddrWidth-1:0] DmExceptionAddr = ItcmBase + 4;
-
-    // Slave base and mask arrays for crossbar
-    function automatic logic [NumSlaves-1:0][AddrWidth-1:0] getSlaveAddrs();
-        logic [NumSlaves-1:0][AddrWidth-1:0] addrs;
-        addrs[SlaveItcm]    = ItcmBase;
-        addrs[SlaveDtcm]    = DtcmBase;
-        addrs[SlaveTimer]   = TimerBase;
-        addrs[SlaveSimCtrl] = SimCtrlBase;
-        return addrs;
-    endfunction
-
-    function automatic logic [NumSlaves-1:0][AddrWidth-1:0] getSlaveMasks();
-        logic [NumSlaves-1:0][AddrWidth-1:0] masks;
-        masks[SlaveItcm]    = ItcmMask;
-        masks[SlaveDtcm]    = DtcmMask;
-        masks[SlaveTimer]   = TimerMask;
-        masks[SlaveSimCtrl] = SimCtrlMask;
-        return masks;
-    endfunction
 
 endpackage

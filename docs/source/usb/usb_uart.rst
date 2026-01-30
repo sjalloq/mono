@@ -45,136 +45,13 @@ The USB UART replaces traditional UART for CPU debug I/O:
     └────────────────────────────────────────────────────────────────────────────┘
 
 
-Memory Map
-----------
+Register Map
+------------
 
-Base address: ``0x1000_2000`` (4KB region)
+The register map is auto-generated from the SystemRDL source
+(``hw/ip/usb/uart/rdl/usb_uart_csr.rdl``).
 
-========  ==================  ====  ==========================================
-Offset    Name                R/W   Description
-========  ==================  ====  ==========================================
-0x00      ``tx_data``         W     Write 32-bit word to TX FIFO
-0x04      ``rx_data``         R     Read 32-bit word from RX Data FIFO
-0x08      ``rx_len``          R     Byte count of current RX packet
-0x0C      ``status``          R     FIFO status flags
-0x10      ``ctrl``            R/W   Control enables and flush triggers
-0x14      ``timeout``         R/W   Idle timeout (clock cycles)
-0x18      ``thresh``          R/W   TX flush threshold (words)
-========  ==================  ====  ==========================================
-
-
-Register Definitions
---------------------
-
-See ``usb_bridge_csr.rdl`` for complete definitions. Key registers below.
-
-tx_data (0x00) - Write Only
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Write a 32-bit word to the TX FIFO. Hardware scans each byte for the
-flush character (default newline ``0x0A``) to trigger automatic flush.
-
-.. code-block:: text
-
-    [31:24]  Byte 3 (MSB)
-    [23:16]  Byte 2
-    [15:8]   Byte 1
-    [7:0]    Byte 0 (LSB, first in stream)
-
-
-rx_data (0x04) - Read Only
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Read a 32-bit word from the RX Data FIFO.
-
-.. code-block:: text
-
-    [31:24]  Byte 3 (MSB)
-    [23:16]  Byte 2
-    [15:8]   Byte 1
-    [7:0]    Byte 0 (LSB, first in stream)
-
-Read when ``status.rx_empty`` is 0. Use ``rx_len`` to determine how many
-bytes are valid in the current packet. Each read pops one word from the
-Data FIFO. After reading ``ceil(rx_len / 4)`` words, the Len FIFO
-automatically advances to the next packet.
-
-
-rx_len (0x2C) - Read Only (NEW)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Byte count of the current RX packet (from Len FIFO head).
-
-.. code-block:: text
-
-    [31:0]   Byte count (0 = no complete packet available)
-
-This register peeks at the head of the Len FIFO without popping it.
-The value becomes non-zero only when a **complete** packet has been
-received (i.e., after ``rx_last`` seen on the USB stream).
-
-After the CPU reads all words for the current packet (``ceil(rx_len / 4)``
-reads from ``rx_data``), the hardware automatically pops the Len FIFO
-and ``rx_len`` updates to show the next queued packet's length, or 0
-if no more packets are available.
-
-**Important**: The CPU does not need to explicitly "acknowledge" the
-packet. Simply reading the correct number of words advances to the next.
-
-
-status (0x0C) - Read Only
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: text
-
-    [0]      tx_empty    TX FIFO is empty
-    [1]      tx_full     TX FIFO is full
-    [2]      rx_valid    Complete packet available (Len FIFO not empty)
-    [3]      rx_full     Data FIFO full (backpressure to USB)
-    [7:4]    tx_level    TX FIFO fill level (words, 4-bit)
-    [11:8]   rx_packets  Number of complete packets queued
-
-Note: ``rx_valid`` reflects the Len FIFO state, not just the Data FIFO.
-This means ``rx_valid=1`` guarantees at least one complete packet is
-available for reading. Partial packets (still receiving) don't count.
-
-
-ctrl (0x10) - Read/Write
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: text
-
-    [0]      tx_en              Enable TX path (default: 1)
-    [1]      rx_en              Enable RX path (default: 1)
-    [2]      nl_flush_en        Auto-flush TX on newline (default: 1)
-    [3]      timeout_flush_en   Auto-flush TX on idle timeout (default: 1)
-    [4]      thresh_flush_en    Auto-flush TX on threshold (default: 0)
-    [5]      tx_flush           Software flush trigger (singlepulse)
-    [6]      rx_flush           Software RX FIFO clear (singlepulse)
-    [8]      irq_rx_en          IRQ when RX packet available
-    [9]      irq_tx_empty_en    IRQ when TX FIFO empty
-
-
-timeout (0x14) - Read/Write
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: text
-
-    [31:0]   Idle timeout in clock cycles
-
-When ``ctrl.timeout_flush_en`` is set, the TX FIFO flushes after this
-many cycles of inactivity. Default: 100000 (~1ms at 100MHz).
-
-
-thresh (0x18) - Read/Write
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: text
-
-    [7:0]    TX flush threshold (words)
-
-When ``ctrl.thresh_flush_en`` is set and TX FIFO level reaches this
-threshold, trigger a flush. Default: 8.
+.. rdl:docnode:: usb_uart_csr
 
 
 TX Path Operation
@@ -186,13 +63,13 @@ Data Flow
 ~~~~~~~~~
 
 1. CPU writes 32-bit words to ``tx_data``
-2. Hardware scans for flush character (default newline ``0x0A``)
+2. Hardware scans for ``flush_char`` (default ``0x0A``) in all 4 byte positions
 3. Flush triggers on:
 
-   - Character match (if ``control.char_flush_en``)
-   - Idle timeout expires (if ``control.timeout_flush_en``)
-   - Threshold reached (if ``control.thresh_flush_en``)
-   - Software flush (``control.tx_flush``)
+   - Character match (if ``ctrl.char_flush_en``)
+   - Idle timeout expires (if ``ctrl.timeout_flush_en``)
+   - Threshold reached (if ``ctrl.thresh_flush_en``)
+   - Software flush (``ctrl.tx_flush``)
 
 4. On flush, stream FIFO contents to USB with:
 
@@ -202,22 +79,15 @@ Data Flow
 
 5. USB packetizer wraps data in packet header
 
-.. note::
+Character Match Detection
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    **Current limitation**: The existing ``usb_bridge_tx_fifo.sv`` only
-    checks byte 0 for character match and always sends ``words * 4`` bytes.
-    For proper UART behavior, it should:
-
-    1. Scan all 4 byte positions for flush character
-    2. Calculate exact byte count up to and including the match
-    3. Output ``length`` with the precise byte count
-
-Character Match Detection (TODO)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Hardware should examine each written word for flush character in any byte:
+Hardware examines each written word for ``flush_char`` in all 4 byte
+positions simultaneously:
 
 .. code-block:: text
+
+    flush_char = 0x0A (newline)
 
     Word written: 0x0D0A6F6C  ('l' 'o' '\n' '\r')
                        ^
@@ -338,27 +208,24 @@ Software should use ``RX_LEN`` to know when to stop extracting bytes:
 Interrupt Behavior
 ------------------
 
-Four interrupt sources, directly ORed to ``irq_o``:
+Four interrupt sources, managed via ``irq_status`` and ``irq_enable``:
 
-When ``control.irq_rx_valid_en`` is set:
+- ``rx_valid`` — RX packet became available (rising edge of ``status.rx_valid``)
+- ``tx_empty`` — TX FIFO became empty (rising edge of ``status.tx_empty``)
+- ``rx_overflow`` — RX Data FIFO overflow (pulse from FIFO)
+- ``len_overflow`` — RX Len FIFO overflow (pulse from FIFO)
 
-- IRQ when complete RX packet available (``rx_len != 0``)
+Each event sets a sticky bit in ``irq_status``. Software clears bits by
+writing 1 (W1C). The interrupt output is:
 
-When ``control.irq_tx_empty_en`` is set:
+.. code-block:: text
 
-- IRQ when TX FIFO becomes empty
-
-When ``control.irq_tx_low_en`` is set:
-
-- IRQ when TX FIFO level drops below ``tx_watermark``
-
-When ``control.irq_rx_high_en`` is set:
-
-- IRQ when RX FIFO level exceeds ``rx_watermark``
+    irq_o = |(irq_status & irq_enable)
 
 The interrupt output is active-high, directly usable as an external
-interrupt to the CPU. Software should check ``status`` to determine
-which condition triggered the interrupt.
+interrupt to the CPU. Software should read ``irq_status`` to determine
+which condition triggered the interrupt, then write 1 to clear the
+serviced bits.
 
 
 Software Interface
@@ -467,19 +334,22 @@ Simple REPL Loop
 SystemRDL Definition
 --------------------
 
-The registers are defined in ``hw/ip/usb_uart/rdl/usb_uart_csr.rdl``.
+The registers are defined in ``hw/ip/usb/uart/rdl/usb_uart_csr.rdl``.
 
 Key features:
 
 - ``tx_data`` @ 0x00 - External write-only, triggers TX FIFO push
 - ``rx_data`` @ 0x04 - External read-only, pops RX Data FIFO
 - ``rx_len`` @ 0x08 - External read-only, peeks at Len FIFO head
-- ``status`` @ 0x0C - Hardware-written status flags
+- ``status`` @ 0x0C - Hardware-written read-only status flags
 - ``ctrl`` @ 0x10 - Control enables with singlepulse flush triggers
 - ``timeout`` @ 0x14 - Idle timeout for auto-flush
 - ``thresh`` @ 0x18 - Threshold for level-based flush
+- ``flush_char`` @ 0x1C - Configurable flush trigger character (default 0x0A)
+- ``irq_status`` @ 0x20 - Sticky W1C interrupt event flags
+- ``irq_enable`` @ 0x24 - Interrupt enable mask
 
-Regenerate CSR with: ``make -C hw/ip/usb_uart/rdl``
+Regenerate CSR with: ``make -C hw/ip/usb/uart/rdl``
 
 
 RTL Structure
@@ -537,11 +407,11 @@ File Locations
 ==========================================  ==========================================
 File                                        Description
 ==========================================  ==========================================
-``hw/ip/usb_uart/rdl/usb_uart_csr.rdl``     SystemRDL register definition
-``hw/ip/usb_uart/rdl/Makefile``             PeakRDL generation
-``hw/ip/usb_uart/rtl/usb_uart_csr_*.sv``    Generated CSR package and top
-``hw/ip/usb_uart/rtl/usb_uart_tx_fifo.sv``  TX FIFO with flush logic
-``hw/ip/usb_uart/rtl/usb_uart_rx_fifo.sv``  RX dual-FIFO with packet tracking
-``hw/ip/usb_uart/rtl/usb_uart.sv``          Top-level module
-``hw/ip/usb_uart/usb_uart.core``            FuseSoC core file
+``hw/ip/usb/uart/rdl/usb_uart_csr.rdl``     SystemRDL register definition
+``hw/ip/usb/uart/rdl/Makefile``             PeakRDL generation
+``hw/ip/usb/uart/rtl/usb_uart_csr_*.sv``    Generated CSR package and top
+``hw/ip/usb/uart/rtl/usb_uart_tx_fifo.sv``  TX FIFO with flush logic
+``hw/ip/usb/uart/rtl/usb_uart_rx_fifo.sv``  RX dual-FIFO with packet tracking
+``hw/ip/usb/uart/rtl/usb_uart.sv``          Top-level module
+``hw/ip/usb/uart/usb_uart.core``            FuseSoC core file
 ==========================================  ==========================================

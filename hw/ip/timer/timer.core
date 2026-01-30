@@ -4,6 +4,8 @@ description: RISC-V timer (mtime/mtimecmp) with Wishbone interface
 
 filesets:
   rtl:
+    depend:
+      - mono:ip:wb_pkg
     files:
       - rtl/wb_timer.sv
     file_type: systemVerilogSource

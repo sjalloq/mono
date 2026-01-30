@@ -36,7 +36,11 @@ module usb_uart_rx_fifo #(
     // Status
     output logic             rx_valid_o,      // Packet available (Len FIFO not empty)
     output logic             rx_full_o,       // Data FIFO full
-    output logic [3:0]       rx_packets_o     // Number of queued packets
+    output logic [3:0]       rx_packets_o,    // Number of queued packets
+
+    // Overflow indicators (active-high pulse)
+    output logic             data_overflow_o, // Data FIFO overflow attempt
+    output logic             len_overflow_o   // Len FIFO overflow attempt
 );
 
     // =========================================================================
@@ -135,6 +139,10 @@ module usb_uart_rx_fifo #(
     assign rx_valid_o   = !len_empty;
     assign rx_full_o    = data_full;
     assign rx_packets_o = len_level_ext;
+
+    // Overflow detection: pulse when valid data is presented but cannot be accepted
+    assign data_overflow_o = rx_valid_i && !rx_ready_o && data_full;
+    assign len_overflow_o  = rx_valid_i && rx_last_i && !rx_ready_o && len_full;
 
     // =========================================================================
     // Combinational Logic

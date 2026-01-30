@@ -1,0 +1,13 @@
+CAPI=2:
+name: mono:ip:wb_pkg
+description: Wishbone bus packed struct typedefs
+
+filesets:
+  rtl:
+    files:
+      - rtl/wb_pkg.sv
+    file_type: systemVerilogSource
+
+targets:
+  default:
+    filesets: [rtl]

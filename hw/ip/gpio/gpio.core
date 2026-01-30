@@ -1,19 +1,23 @@
 CAPI=2:
-name: mono:ip:usb_bridge:0.1.0
-description: USB Wishbone Bridge for CPU<->USB Host communication
+name: mono:ip:gpio:0.1.0
+description: GPIO - General Purpose I/O with per-bit atomic operations
 
 filesets:
   rtl:
     files:
-      - rtl/usb_bridge_csr_reg_pkg.sv
-      - rtl/usb_bridge_csr_reg_top.sv
-      - rtl/usb_bridge_tx_fifo.sv
-      - rtl/usb_bridge_rx_fifo.sv
-      - rtl/usb_wishbone_bridge.sv
+      - rtl/gpio_csr_reg_pkg.sv
+      - rtl/gpio_csr_reg_top.sv
+      - rtl/gpio_bit_ctrl.sv
+      - rtl/gpio.sv
       - target_lint ? (lint/verilator.vlt): {file_type: vlt}
     file_type: systemVerilogSource
     depend:
       - mono:ip:csr
+
+  dv:
+    files:
+      - dv/gpio_tb.sv
+    file_type: systemVerilogSource
 
 targets:
   default: &default
@@ -22,20 +26,24 @@ targets:
   lint:
     <<: *default
     default_tool: verilator
-    toplevel: usb_wishbone_bridge
+    toplevel: gpio
     tools:
       verilator:
         mode: lint-only
         verilator_options:
           - -Wall
-          - --top-module usb_wishbone_bridge
+          - --top-module gpio
 
   sim:
     <<: *default
+    filesets: [rtl, dv]
     default_tool: verilator
-    toplevel: usb_wishbone_bridge
+    toplevel: gpio_tb
     tools:
       verilator:
         verilator_options:
+          - --binary
           - --trace
           - --trace-fst
+          - --timing
+          - -Wno-INITIALDLY

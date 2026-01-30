@@ -4,6 +4,8 @@ description: CSR infrastructure for PeakRDL-sv generated register blocks
 
 filesets:
   rtl:
+    depend:
+      - mono:ip:wb_pkg
     files:
       - rtl/rdl_subreg_pkg.sv
       - rtl/rdl_subreg_arb.sv

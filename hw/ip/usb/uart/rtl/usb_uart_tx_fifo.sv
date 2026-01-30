@@ -4,10 +4,11 @@
 // Copyright (c) 2025-2026 Shareef Jalloq
 //
 // TX FIFO for CPU->USB data path with multiple flush mechanisms:
-// - Newline flush (scans all 4 bytes for 0x0A)
+// - Character flush (scans all 4 bytes for configurable character)
 // - Timeout-based flush (after N cycles of inactivity)
 // - Threshold-based flush (when level reaches N entries)
 // - Software flush trigger
+// - Software clear (discard all data)
 //
 // Outputs usb_channel_description stream with precise byte count.
 
@@ -32,8 +33,10 @@ module usb_uart_tx_fifo #(
 
     // Control inputs
     input  logic             enable_i,
-    input  logic             sw_flush_i,         // Software flush trigger
-    input  logic             nl_flush_en_i,      // Enable newline flush
+    input  logic             sw_flush_i,         // Software flush trigger (send data)
+    input  logic             sw_clear_i,         // Software clear (discard data)
+    input  logic             char_flush_en_i,    // Enable character match flush
+    input  logic [7:0]       flush_char_i,       // Character to match for flush
     input  logic             timeout_flush_en_i, // Enable timeout flush
     input  logic             thresh_flush_en_i,  // Enable threshold flush
     input  logic [31:0]      flush_timeout_i,    // Timeout value in cycles
@@ -50,7 +53,6 @@ module usb_uart_tx_fifo #(
     // =========================================================================
 
     localparam int unsigned ADDR_W = $clog2(DEPTH);
-    localparam logic [7:0] NEWLINE = 8'h0A;
 
     typedef enum logic [1:0] {
         IDLE,
@@ -94,42 +96,42 @@ module usb_uart_tx_fifo #(
     logic [ADDR_W:0] flush_word_count_q, flush_word_count_d;
     logic [ADDR_W:0] words_sent_q, words_sent_d;
 
-    // Newline detection in current write
-    logic [3:0] nl_match;
-    logic       nl_found;
-    logic [1:0] nl_pos;  // Byte position of first newline (0-3)
+    // Character detection in current write
+    logic [3:0] char_match;
+    logic       char_found;
+    logic [1:0] char_pos;  // Byte position of first match (0-3)
 
     // Flush triggers
     logic timeout_trigger;
     logic thresh_trigger;
-    logic nl_trigger;
+    logic char_trigger;
     logic any_flush_trigger;
 
     // =========================================================================
-    // Newline Detection (parallel scan of all 4 bytes)
+    // Character Detection (parallel scan of all 4 bytes)
     // =========================================================================
 
-    assign nl_match[0] = (wr_data_i[7:0]   == NEWLINE);
-    assign nl_match[1] = (wr_data_i[15:8]  == NEWLINE);
-    assign nl_match[2] = (wr_data_i[23:16] == NEWLINE);
-    assign nl_match[3] = (wr_data_i[31:24] == NEWLINE);
+    assign char_match[0] = (wr_data_i[7:0]   == flush_char_i);
+    assign char_match[1] = (wr_data_i[15:8]  == flush_char_i);
+    assign char_match[2] = (wr_data_i[23:16] == flush_char_i);
+    assign char_match[3] = (wr_data_i[31:24] == flush_char_i);
 
-    assign nl_found = |nl_match;
+    assign char_found = |char_match;
 
-    // Priority encode: find lowest byte position with newline
+    // Priority encode: find lowest byte position with match
     always_comb begin
-        if (nl_match[0])      nl_pos = 2'd0;
-        else if (nl_match[1]) nl_pos = 2'd1;
-        else if (nl_match[2]) nl_pos = 2'd2;
-        else                  nl_pos = 2'd3;
+        if (char_match[0])      char_pos = 2'd0;
+        else if (char_match[1]) char_pos = 2'd1;
+        else if (char_match[2]) char_pos = 2'd2;
+        else                    char_pos = 2'd3;
     end
 
     // =========================================================================
     // Flush Trigger Detection
     // =========================================================================
 
-    // Newline trigger: on write with newline detected
-    assign nl_trigger = nl_flush_en_i && wr_valid_i && !full_o && enable_i && nl_found;
+    // Character trigger: on write with match detected
+    assign char_trigger = char_flush_en_i && wr_valid_i && !full_o && enable_i && char_found;
 
     // Timeout: fire when counter reaches threshold and FIFO not empty
     assign timeout_trigger = timeout_flush_en_i && !empty_o &&
@@ -145,7 +147,7 @@ module usb_uart_tx_fifo #(
 
     // Combined (only in IDLE state)
     assign any_flush_trigger = (state_q == IDLE) && !empty_o &&
-                               (sw_flush_i || timeout_trigger || thresh_trigger || nl_trigger);
+                               (sw_flush_i || timeout_trigger || thresh_trigger || char_trigger);
 
     // =========================================================================
     // Write Logic
@@ -181,49 +183,60 @@ module usb_uart_tx_fifo #(
         flush_word_count_d = flush_word_count_q;
         words_sent_d       = words_sent_q;
 
-        case (state_q)
-            IDLE: begin
-                // Handle writes
-                if (wr_en) begin
-                    wr_ptr_d = wr_ptr_q + 1;
-                    timeout_cnt_d = '0;  // Reset timeout on write
-                end else if (!empty_o && timeout_flush_en_i) begin
-                    timeout_cnt_d = timeout_cnt_q + 1;
-                end
-
-                // Check for flush trigger
-                if (any_flush_trigger) begin
-                    // Calculate byte count
-                    if (nl_trigger) begin
-                        // Newline flush: include bytes up to and including newline
-                        // Words before current = level_int (before this write is committed)
-                        // Plus bytes in current word up to newline
-                        flush_byte_count_d = (level_int * 4) + {30'd0, nl_pos} + 1;
-                        flush_word_count_d = level_int + 1;  // Include word being written
-                    end else begin
-                        // Other triggers: full words
-                        flush_byte_count_d = 32'(level_int) << 2;  // level * 4
-                        flush_word_count_d = level_int;
+        // Software clear: discard all data, reset to IDLE
+        if (sw_clear_i) begin
+            state_d            = IDLE;
+            wr_ptr_d           = '0;
+            rd_ptr_d           = '0;
+            timeout_cnt_d      = '0;
+            flush_byte_count_d = '0;
+            flush_word_count_d = '0;
+            words_sent_d       = '0;
+        end else begin
+            case (state_q)
+                IDLE: begin
+                    // Handle writes
+                    if (wr_en) begin
+                        wr_ptr_d = wr_ptr_q + 1;
+                        timeout_cnt_d = '0;  // Reset timeout on write
+                    end else if (!empty_o && timeout_flush_en_i) begin
+                        timeout_cnt_d = timeout_cnt_q + 1;
                     end
-                    words_sent_d = '0;
-                    state_d = SEND_DATA;
-                end
-            end
 
-            SEND_DATA: begin
-                if (tx_valid_o && tx_ready_i) begin
-                    rd_ptr_d = rd_ptr_q + 1;
-                    words_sent_d = words_sent_q + 1;
-
-                    if (tx_last_o) begin
-                        state_d = IDLE;
-                        timeout_cnt_d = '0;
+                    // Check for flush trigger
+                    if (any_flush_trigger) begin
+                        // Calculate byte count
+                        if (char_trigger) begin
+                            // Character flush: include bytes up to and including match
+                            // Words before current = level_int (before this write is committed)
+                            // Plus bytes in current word up to match
+                            flush_byte_count_d = (level_int * 4) + {30'd0, char_pos} + 1;
+                            flush_word_count_d = level_int + 1;  // Include word being written
+                        end else begin
+                            // Other triggers: full words
+                            flush_byte_count_d = 32'(level_int) << 2;  // level * 4
+                            flush_word_count_d = level_int;
+                        end
+                        words_sent_d = '0;
+                        state_d = SEND_DATA;
                     end
                 end
-            end
 
-            default: state_d = IDLE;
-        endcase
+                SEND_DATA: begin
+                    if (tx_valid_o && tx_ready_i) begin
+                        rd_ptr_d = rd_ptr_q + 1;
+                        words_sent_d = words_sent_q + 1;
+
+                        if (tx_last_o) begin
+                            state_d = IDLE;
+                            timeout_cnt_d = '0;
+                        end
+                    end
+                end
+
+                default: state_d = IDLE;
+            endcase
+        end
     end
 
     // =========================================================================

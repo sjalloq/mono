@@ -10,112 +10,100 @@
 // - RISC-V timer
 // - Simulation control peripheral
 // - USB Etherbone master interface
+// - Parameterized external Wishbone slave ports
 
 module ibex_soc_top
     import ibex_soc_pkg::*;
+    import ibex_pkg::crash_dump_t;
+    import wb_pkg::*;
 #(
     parameter string ItcmInitFile = "",  // Hex file for ITCM initialization
-    parameter string DtcmInitFile = ""   // Hex file for DTCM initialization
+    parameter string DtcmInitFile = "",  // Hex file for DTCM initialization
+    parameter int unsigned NumExtSlaves = 0
 ) (
     input  logic             clk_i,
     input  logic             rst_ni,
 
     // External Etherbone Wishbone master interface
-    // (directly connects to USB Etherbone generated module)
-    input  logic             eb_cyc_i,
-    input  logic             eb_stb_i,
-    input  logic             eb_we_i,
-    input  logic [31:0]      eb_adr_i,
-    input  logic [3:0]       eb_sel_i,
-    input  logic [31:0]      eb_dat_i,
-    output logic [31:0]      eb_dat_o,
-    output logic             eb_ack_o,
-    output logic             eb_err_o,
-    output logic             eb_stall_o,
+    input  wb_m2s_t          eb_wb_m2s_i,
+    output wb_s2m_t          eb_wb_s2m_o,
+
+    // External Wishbone slave ports
+    output wb_m2s_t [NumExtSlaves > 0 ? NumExtSlaves-1 : 0:0] ext_wb_m2s_o,
+    input  wb_s2m_t [NumExtSlaves > 0 ? NumExtSlaves-1 : 0:0] ext_wb_s2m_i,
 
     // Simulation control outputs (directly accessible by testbench)
     output logic             sim_halt_o,
     output logic             sim_char_valid_o,
-    output logic [7:0]       sim_char_data_o
+    output logic [7:0]       sim_char_data_o,
+
+    // CPU status / error outputs
+    output logic             alert_minor_o,
+    output logic             alert_major_internal_o,
+    output logic             alert_major_bus_o,
+    output logic             double_fault_seen_o,
+    output crash_dump_t      crash_dump_o
 );
+
+    // =========================================================================
+    // Address map: concatenate internal + external slave address maps
+    // =========================================================================
+
+    localparam int unsigned NumSlaves = NumIntSlaves + NumExtSlaves;
+
+    logic [NumSlaves-1:0][AddrWidth-1:0] cfg_addr_base;
+    logic [NumSlaves-1:0][AddrWidth-1:0] cfg_addr_mask;
+
+    assign cfg_addr_base[SlaveItcm] = ItcmBase;
+    assign cfg_addr_mask[SlaveItcm] = ItcmMask;
+    assign cfg_addr_base[SlaveDtcm] = DtcmBase;
+    assign cfg_addr_mask[SlaveDtcm] = DtcmMask;
+
+    for (genvar i = 0; i < NumIntPeriphs + NumExtSlaves; i++) begin : gen_periph_addr
+        assign cfg_addr_base[NumMemSlaves + i] = PeriphBase + i * 32'h1000;
+        assign cfg_addr_mask[NumMemSlaves + i] = PeriphMask;
+    end
 
     // =========================================================================
     // Internal signals
     // =========================================================================
 
-    // CPU interfaces
-    logic        cpu_ibus_cyc, cpu_ibus_stb, cpu_ibus_we;
-    logic [31:0] cpu_ibus_adr, cpu_ibus_dat_w, cpu_ibus_dat_r;
-    logic [3:0]  cpu_ibus_sel;
-    logic        cpu_ibus_ack, cpu_ibus_err, cpu_ibus_stall;
-
-    logic        cpu_dbus_cyc, cpu_dbus_stb, cpu_dbus_we;
-    logic [31:0] cpu_dbus_adr, cpu_dbus_dat_w, cpu_dbus_dat_r;
-    logic [3:0]  cpu_dbus_sel;
-    logic        cpu_dbus_ack, cpu_dbus_err, cpu_dbus_stall;
-
-    // Crossbar master signals (packed arrays)
-    logic [NumMasters-1:0]        m_cyc, m_stb, m_we;
-    logic [NumMasters-1:0][31:0]  m_adr, m_dat_w, m_dat_r;
-    logic [NumMasters-1:0][3:0]   m_sel;
-    logic [NumMasters-1:0]        m_ack, m_err, m_stall;
-
-    // Crossbar slave signals (packed arrays)
-    logic [NumSlaves-1:0]         s_cyc, s_stb, s_we;
-    logic [NumSlaves-1:0][31:0]   s_adr, s_dat_w, s_dat_r;
-    logic [NumSlaves-1:0][3:0]    s_sel;
-    logic [NumSlaves-1:0]         s_ack, s_err, s_stall;
+    // Crossbar struct arrays
+    wb_m2s_t [NumMasters-1:0] m2s;
+    wb_s2m_t [NumMasters-1:0] s2m;
+    wb_m2s_t [NumSlaves-1:0]  s_m2s;
+    wb_s2m_t [NumSlaves-1:0]  s_s2m;
 
     // Interrupts
     logic timer_irq;
 
     // =========================================================================
-    // Pack master signals into crossbar format
+    // Master port wiring
     // =========================================================================
 
-    // Master 0: CPU I-bus
-    assign m_cyc[MasterIbus]   = cpu_ibus_cyc;
-    assign m_stb[MasterIbus]   = cpu_ibus_stb;
-    assign m_we[MasterIbus]    = cpu_ibus_we;
-    assign m_adr[MasterIbus]   = cpu_ibus_adr;
-    assign m_sel[MasterIbus]   = cpu_ibus_sel;
-    assign m_dat_w[MasterIbus] = cpu_ibus_dat_w;
-    assign cpu_ibus_dat_r      = m_dat_r[MasterIbus];
-    assign cpu_ibus_ack        = m_ack[MasterIbus];
-    assign cpu_ibus_err        = m_err[MasterIbus];
-    assign cpu_ibus_stall      = m_stall[MasterIbus];
-
-    // Master 1: CPU D-bus
-    assign m_cyc[MasterDbus]   = cpu_dbus_cyc;
-    assign m_stb[MasterDbus]   = cpu_dbus_stb;
-    assign m_we[MasterDbus]    = cpu_dbus_we;
-    assign m_adr[MasterDbus]   = cpu_dbus_adr;
-    assign m_sel[MasterDbus]   = cpu_dbus_sel;
-    assign m_dat_w[MasterDbus] = cpu_dbus_dat_w;
-    assign cpu_dbus_dat_r      = m_dat_r[MasterDbus];
-    assign cpu_dbus_ack        = m_ack[MasterDbus];
-    assign cpu_dbus_err        = m_err[MasterDbus];
-    assign cpu_dbus_stall      = m_stall[MasterDbus];
-
     // Master 2: Etherbone
-    assign m_cyc[MasterEb]     = eb_cyc_i;
-    assign m_stb[MasterEb]     = eb_stb_i;
-    assign m_we[MasterEb]      = eb_we_i;
-    assign m_adr[MasterEb]     = eb_adr_i;
-    assign m_sel[MasterEb]     = eb_sel_i;
-    assign m_dat_w[MasterEb]   = eb_dat_i;
-    assign eb_dat_o            = m_dat_r[MasterEb];
-    assign eb_ack_o            = m_ack[MasterEb];
-    assign eb_err_o            = m_err[MasterEb];
-    assign eb_stall_o          = m_stall[MasterEb];
+    assign m2s[MasterEb] = eb_wb_m2s_i;
+    assign eb_wb_s2m_o   = s2m[MasterEb];
+
+    // =========================================================================
+    // External slave port wiring
+    // =========================================================================
+
+    for (genvar i = 0; i < NumExtSlaves; i++) begin : gen_ext_slaves
+        assign ext_wb_m2s_o[i] = s_m2s[NumIntSlaves + i];
+        assign s_s2m[NumIntSlaves + i] = ext_wb_s2m_i[i];
+    end
+
+    // When NumExtSlaves == 0, tie off the unused external ports
+    if (NumExtSlaves == 0) begin : gen_no_ext_slaves
+        assign ext_wb_m2s_o[0] = '0;
+    end
 
     // =========================================================================
     // Ibex CPU
     // =========================================================================
 
     ibex_wb_top #(
-        .AW              (32),
-        .DW              (32),
         .PMPEnable       (1'b0),
         .RV32E           (1'b0),
         .RV32B           (1'b0),
@@ -127,28 +115,12 @@ module ibex_soc_top
         .boot_addr_i     (BootAddr),
 
         // Instruction bus
-        .ibus_cyc_o      (cpu_ibus_cyc),
-        .ibus_stb_o      (cpu_ibus_stb),
-        .ibus_we_o       (cpu_ibus_we),
-        .ibus_adr_o      (cpu_ibus_adr),
-        .ibus_sel_o      (cpu_ibus_sel),
-        .ibus_dat_o      (cpu_ibus_dat_w),
-        .ibus_dat_i      (cpu_ibus_dat_r),
-        .ibus_ack_i      (cpu_ibus_ack),
-        .ibus_err_i      (cpu_ibus_err),
-        .ibus_stall_i    (cpu_ibus_stall),
+        .ibus_m2s_o      (m2s[MasterIbus]),
+        .ibus_s2m_i      (s2m[MasterIbus]),
 
         // Data bus
-        .dbus_cyc_o      (cpu_dbus_cyc),
-        .dbus_stb_o      (cpu_dbus_stb),
-        .dbus_we_o       (cpu_dbus_we),
-        .dbus_adr_o      (cpu_dbus_adr),
-        .dbus_sel_o      (cpu_dbus_sel),
-        .dbus_dat_o      (cpu_dbus_dat_w),
-        .dbus_dat_i      (cpu_dbus_dat_r),
-        .dbus_ack_i      (cpu_dbus_ack),
-        .dbus_err_i      (cpu_dbus_err),
-        .dbus_stall_i    (cpu_dbus_stall),
+        .dbus_m2s_o      (m2s[MasterDbus]),
+        .dbus_s2m_i      (s2m[MasterDbus]),
 
         // Interrupts
         .irq_software_i  (1'b0),
@@ -159,47 +131,49 @@ module ibex_soc_top
 
         // CPU control
         .fetch_enable_i  (1'b1),
-        .core_sleep_o    ()
+        .core_sleep_o    (),
+
+        // CPU status / error
+        .alert_minor_o          (alert_minor_o),
+        .alert_major_internal_o (alert_major_internal_o),
+        .alert_major_bus_o      (alert_major_bus_o),
+        .double_fault_seen_o    (double_fault_seen_o),
+        .crash_dump_o           (crash_dump_o)
     );
 
     // =========================================================================
     // Wishbone Crossbar
     // =========================================================================
 
+    function automatic logic [NumMasters-1:0][NumSlaves-1:0] get_slave_access();
+        logic [NumMasters-1:0][NumSlaves-1:0] access;
+        access             = '1;               // default: full connectivity
+        access[MasterIbus] = '0;               // ibus: clear all
+        access[MasterIbus][SlaveItcm] = 1'b1;  // ibus: ITCM only
+        access[MasterEb]  [SlaveItcm] = 1'b0;  // eb:   no ITCM
+        return access;
+    endfunction
+
+    localparam logic [NumMasters-1:0][NumSlaves-1:0] XbarSlaveAccess = get_slave_access();
+
     wb_crossbar #(
-        .NumMasters (NumMasters),
-        .NumSlaves  (NumSlaves),
-        .AddrWidth  (32),
-        .DataWidth  (32),
-        .AddrBase   (getSlaveAddrs()),
-        .AddrMask   (getSlaveMasks())
+        .NumMasters  (NumMasters),
+        .NumSlaves   (NumSlaves),
+        .SlaveAccess (XbarSlaveAccess)
     ) u_crossbar (
-        .clk_i       (clk_i),
-        .rst_ni      (rst_ni),
+        .clk_i           (clk_i),
+        .rst_ni          (rst_ni),
+
+        .cfg_addr_base_i (cfg_addr_base),
+        .cfg_addr_mask_i (cfg_addr_mask),
 
         // Masters
-        .m_cyc_i     (m_cyc),
-        .m_stb_i     (m_stb),
-        .m_we_i      (m_we),
-        .m_adr_i     (m_adr),
-        .m_sel_i     (m_sel),
-        .m_dat_i     (m_dat_w),
-        .m_dat_o     (m_dat_r),
-        .m_ack_o     (m_ack),
-        .m_err_o     (m_err),
-        .m_stall_o   (m_stall),
+        .m_i         (m2s),
+        .m_o         (s2m),
 
         // Slaves
-        .s_cyc_o     (s_cyc),
-        .s_stb_o     (s_stb),
-        .s_we_o      (s_we),
-        .s_adr_o     (s_adr),
-        .s_sel_o     (s_sel),
-        .s_dat_o     (s_dat_w),
-        .s_dat_i     (s_dat_r),
-        .s_ack_i     (s_ack),
-        .s_err_i     (s_err),
-        .s_stall_i   (s_stall)
+        .s_o         (s_m2s),
+        .s_i         (s_s2m)
     );
 
     // =========================================================================
@@ -207,23 +181,13 @@ module ibex_soc_top
     // =========================================================================
 
     wb_tcm #(
-        .Width       (32),
         .Depth       (ItcmDepth),
         .MemInitFile (ItcmInitFile)
     ) u_itcm (
         .clk_i     (clk_i),
         .rst_ni    (rst_ni),
-
-        .wb_cyc_i  (s_cyc[SlaveItcm]),
-        .wb_stb_i  (s_stb[SlaveItcm]),
-        .wb_we_i   (s_we[SlaveItcm]),
-        .wb_adr_i  (s_adr[SlaveItcm]),
-        .wb_sel_i  (s_sel[SlaveItcm]),
-        .wb_dat_i  (s_dat_w[SlaveItcm]),
-        .wb_dat_o  (s_dat_r[SlaveItcm]),
-        .wb_ack_o  (s_ack[SlaveItcm]),
-        .wb_err_o  (s_err[SlaveItcm]),
-        .wb_stall_o(s_stall[SlaveItcm])
+        .wb_m2s_i  (s_m2s[SlaveItcm]),
+        .wb_s2m_o  (s_s2m[SlaveItcm])
     );
 
     // =========================================================================
@@ -231,23 +195,13 @@ module ibex_soc_top
     // =========================================================================
 
     wb_tcm #(
-        .Width       (32),
         .Depth       (DtcmDepth),
         .MemInitFile (DtcmInitFile)
     ) u_dtcm (
         .clk_i     (clk_i),
         .rst_ni    (rst_ni),
-
-        .wb_cyc_i  (s_cyc[SlaveDtcm]),
-        .wb_stb_i  (s_stb[SlaveDtcm]),
-        .wb_we_i   (s_we[SlaveDtcm]),
-        .wb_adr_i  (s_adr[SlaveDtcm]),
-        .wb_sel_i  (s_sel[SlaveDtcm]),
-        .wb_dat_i  (s_dat_w[SlaveDtcm]),
-        .wb_dat_o  (s_dat_r[SlaveDtcm]),
-        .wb_ack_o  (s_ack[SlaveDtcm]),
-        .wb_err_o  (s_err[SlaveDtcm]),
-        .wb_stall_o(s_stall[SlaveDtcm])
+        .wb_m2s_i  (s_m2s[SlaveDtcm]),
+        .wb_s2m_o  (s_s2m[SlaveDtcm])
     );
 
     // =========================================================================
@@ -255,21 +209,11 @@ module ibex_soc_top
     // =========================================================================
 
     wb_timer u_timer (
-        .clk_i      (clk_i),
-        .rst_ni     (rst_ni),
-
-        .wb_cyc_i   (s_cyc[SlaveTimer]),
-        .wb_stb_i   (s_stb[SlaveTimer]),
-        .wb_we_i    (s_we[SlaveTimer]),
-        .wb_adr_i   (s_adr[SlaveTimer]),
-        .wb_sel_i   (s_sel[SlaveTimer]),
-        .wb_dat_i   (s_dat_w[SlaveTimer]),
-        .wb_dat_o   (s_dat_r[SlaveTimer]),
-        .wb_ack_o   (s_ack[SlaveTimer]),
-        .wb_err_o   (s_err[SlaveTimer]),
-        .wb_stall_o (s_stall[SlaveTimer]),
-
-        .timer_irq_o(timer_irq)
+        .clk_i       (clk_i),
+        .rst_ni      (rst_ni),
+        .wb_m2s_i    (s_m2s[SlaveTimer]),
+        .wb_s2m_o    (s_s2m[SlaveTimer]),
+        .timer_irq_o (timer_irq)
     );
 
     // =========================================================================
@@ -277,20 +221,10 @@ module ibex_soc_top
     // =========================================================================
 
     wb_sim_ctrl u_sim_ctrl (
-        .clk_i      (clk_i),
-        .rst_ni     (rst_ni),
-
-        .wb_cyc_i   (s_cyc[SlaveSimCtrl]),
-        .wb_stb_i   (s_stb[SlaveSimCtrl]),
-        .wb_we_i    (s_we[SlaveSimCtrl]),
-        .wb_adr_i   (s_adr[SlaveSimCtrl]),
-        .wb_sel_i   (s_sel[SlaveSimCtrl]),
-        .wb_dat_i   (s_dat_w[SlaveSimCtrl]),
-        .wb_dat_o   (s_dat_r[SlaveSimCtrl]),
-        .wb_ack_o   (s_ack[SlaveSimCtrl]),
-        .wb_err_o   (s_err[SlaveSimCtrl]),
-        .wb_stall_o (s_stall[SlaveSimCtrl]),
-
+        .clk_i        (clk_i),
+        .rst_ni       (rst_ni),
+        .wb_m2s_i     (s_m2s[SlaveSimCtrl]),
+        .wb_s2m_o     (s_s2m[SlaveSimCtrl]),
         .sim_halt_o   (sim_halt_o),
         .char_valid_o (sim_char_valid_o),
         .char_data_o  (sim_char_data_o)

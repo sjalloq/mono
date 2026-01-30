@@ -4,7 +4,7 @@
 // Copyright (c) 2025-2026 Shareef Jalloq
 //
 // SystemRDL register definitions for the USB UART.
-// Regenerate SV: source sourceme && make -C hw/ip/usb_uart/rdl
+// Regenerate SV: source sourceme && make -C hw/ip/usb/uart/rdl
 
 addrmap usb_uart_csr {
     name = "USB UART CSRs";
@@ -17,7 +17,7 @@ addrmap usb_uart_csr {
     // =========================================================================
     reg tx_data_reg {
         name = "TX Data";
-        desc = "Write 32-bit word to TX FIFO. Hardware scans for newline to trigger flush.";
+        desc = "Write 32-bit word to TX FIFO. Hardware scans for flush character to trigger flush.";
 
         field {
             sw = w;
@@ -93,6 +93,7 @@ addrmap usb_uart_csr {
             sw = r;
             hw = w;
         } rx_packets[11:8] = 0;
+
     };
 
     // =========================================================================
@@ -115,10 +116,10 @@ addrmap usb_uart_csr {
         } rx_en[1:1] = 1;
 
         field {
-            desc = "Auto-flush on newline (0x0A)";
+            desc = "Auto-flush on character match (see flush_char register)";
             sw = rw;
             hw = r;
-        } nl_flush_en[2:2] = 1;
+        } char_flush_en[2:2] = 1;
 
         field {
             desc = "Auto-flush on idle timeout";
@@ -147,16 +148,12 @@ addrmap usb_uart_csr {
         } rx_flush[6:6] = 0;
 
         field {
-            desc = "IRQ enable: RX packet available";
+            desc = "TX FIFO clear/reset (write-1-to-trigger)";
             sw = rw;
             hw = r;
-        } irq_rx_en[8:8] = 0;
+            singlepulse;
+        } tx_clear[7:7] = 0;
 
-        field {
-            desc = "IRQ enable: TX FIFO empty";
-            sw = rw;
-            hw = r;
-        } irq_tx_empty_en[9:9] = 0;
     };
 
     // =========================================================================
@@ -186,6 +183,87 @@ addrmap usb_uart_csr {
     };
 
     // =========================================================================
+    // FLUSH_CHAR - Configurable flush trigger character
+    // =========================================================================
+    reg flush_char_reg {
+        name = "Flush Character";
+        desc = "Character to match for flush trigger (default 0x0A = newline)";
+
+        field {
+            sw = rw;
+            hw = r;
+        } character[7:0] = 0x0A;
+    };
+
+    // =========================================================================
+    // IRQ_STATUS - Sticky interrupt event flags (W1C)
+    // =========================================================================
+    reg irq_status_reg {
+        name = "IRQ Status";
+        desc = "Sticky interrupt event flags. HW sets on event pulse. SW clears by writing 1.";
+
+        field {
+            desc = "RX packet available";
+            sw = rw;
+            hw = rw;
+            onwrite = woclr;
+        } rx_valid[0:0] = 0;
+
+        field {
+            desc = "TX FIFO empty";
+            sw = rw;
+            hw = rw;
+            onwrite = woclr;
+        } tx_empty[1:1] = 0;
+
+        field {
+            desc = "RX Data FIFO overflow";
+            sw = rw;
+            hw = rw;
+            onwrite = woclr;
+        } rx_overflow[2:2] = 0;
+
+        field {
+            desc = "RX Len FIFO overflow";
+            sw = rw;
+            hw = rw;
+            onwrite = woclr;
+        } len_overflow[3:3] = 0;
+    };
+
+    // =========================================================================
+    // IRQ_ENABLE - Which events drive irq_o
+    // =========================================================================
+    reg irq_enable_reg {
+        name = "IRQ Enable";
+        desc = "Enable mask for interrupt sources. irq_o = |(irq_status & irq_enable).";
+
+        field {
+            desc = "Enable IRQ on RX packet available";
+            sw = rw;
+            hw = r;
+        } rx_valid[0:0] = 0;
+
+        field {
+            desc = "Enable IRQ on TX FIFO empty";
+            sw = rw;
+            hw = r;
+        } tx_empty[1:1] = 0;
+
+        field {
+            desc = "Enable IRQ on RX Data FIFO overflow";
+            sw = rw;
+            hw = r;
+        } rx_overflow[2:2] = 0;
+
+        field {
+            desc = "Enable IRQ on RX Len FIFO overflow";
+            sw = rw;
+            hw = r;
+        } len_overflow[3:3] = 0;
+    };
+
+    // =========================================================================
     // Register instantiation
     // =========================================================================
 
@@ -195,8 +273,11 @@ addrmap usb_uart_csr {
     external rx_len_reg   rx_len   @ 0x08;
 
     // Internal registers: PeakRDL generates storage
-    status_reg            status   @ 0x0C;
-    ctrl_reg              ctrl     @ 0x10;
-    timeout_reg           timeout  @ 0x14;
-    thresh_reg            thresh   @ 0x18;
+    status_reg            status     @ 0x0C;
+    ctrl_reg              ctrl       @ 0x10;
+    timeout_reg           timeout    @ 0x14;
+    thresh_reg            thresh     @ 0x18;
+    flush_char_reg        flush_char @ 0x1C;
+    irq_status_reg        irq_status @ 0x20;
+    irq_enable_reg        irq_enable @ 0x24;
 };

@@ -15,9 +15,9 @@
 
 `ifdef VERILATOR
 
-module wb_sim_ctrl #(
-    parameter int unsigned AW       = 32,
-    parameter int unsigned DW       = 32,
+module wb_sim_ctrl
+    import wb_pkg::*;
+#(
     parameter string       LogName  = "sim_out.log",
     parameter bit          FlushOnChar = 1,
     parameter bit          UseFinish   = 0  // Set to 0 for Cocotb compatibility
@@ -26,16 +26,8 @@ module wb_sim_ctrl #(
     input  logic             rst_ni,
 
     // Wishbone pipelined slave interface
-    input  logic             wb_cyc_i,
-    input  logic             wb_stb_i,
-    input  logic             wb_we_i,
-    input  logic [AW-1:0]    wb_adr_i,
-    input  logic [DW/8-1:0]  wb_sel_i,
-    input  logic [DW-1:0]    wb_dat_i,
-    output logic [DW-1:0]    wb_dat_o,
-    output logic             wb_ack_o,
-    output logic             wb_err_o,
-    output logic             wb_stall_o,
+    input  wb_m2s_t          wb_m2s_i,
+    output wb_s2m_t          wb_s2m_o,
 
     // Simulation control outputs (directly accessible)
     output logic             sim_halt_o,    // High when software requests halt
@@ -68,21 +60,14 @@ module wb_sim_ctrl #(
     assign char_data_o  = char_data_q;
 
     // Address decode (word address from bits [3:2])
-    assign word_addr = wb_adr_i[3:2];
-    assign valid_access = wb_cyc_i && wb_stb_i;
+    assign word_addr = wb_m2s_i.adr[3:2];
+    assign valid_access = wb_m2s_i.cyc && wb_m2s_i.stb;
 
-    // Pipelined: never stall
-    assign wb_stall_o = 1'b0;
-
-    // No errors
-    assign wb_err_o = 1'b0;
-
-    // Read data always zero (write-only registers)
-    assign wb_dat_o = '0;
+    // Output struct
+    assign wb_s2m_o = '{dat: '0, ack: wb_ack_q, err: 1'b0, stall: 1'b0};
 
     // ACK logic
     assign wb_ack_d = valid_access;
-    assign wb_ack_o = wb_ack_q;
 
     // Open log file
     initial begin
@@ -110,12 +95,12 @@ module wb_sim_ctrl #(
             char_data_q <= char_data_d;
 
             // Handle writes
-            if (valid_access && wb_we_i) begin
+            if (valid_access && wb_m2s_i.we) begin
                 case (word_addr)
                     ADDR_SIM_OUT: begin
                         // Character output
-                        if (wb_sel_i[0]) begin
-                            $fwrite(log_fd, "%c", wb_dat_i[7:0]);
+                        if (wb_m2s_i.sel[0]) begin
+                            $fwrite(log_fd, "%c", wb_m2s_i.dat[7:0]);
                             if (FlushOnChar) begin
                                 $fflush(log_fd);
                             end
@@ -123,7 +108,7 @@ module wb_sim_ctrl #(
                     end
                     ADDR_SIM_CTRL: begin
                         // Simulation halt request
-                        if (wb_sel_i[0] && wb_dat_i[0] && (sim_finish == 3'b0)) begin
+                        if (wb_m2s_i.sel[0] && wb_m2s_i.dat[0] && (sim_finish == 3'b0)) begin
                             if (UseFinish) $display("Terminating simulation by software request.");
                             sim_finish <= 3'b001;
                         end
@@ -147,9 +132,9 @@ module wb_sim_ctrl #(
         char_valid_d = 1'b0;
         char_data_d = char_data_q;
 
-        if (valid_access && wb_we_i && (word_addr == ADDR_SIM_OUT) && wb_sel_i[0]) begin
+        if (valid_access && wb_m2s_i.we && (word_addr == ADDR_SIM_OUT) && wb_m2s_i.sel[0]) begin
             char_valid_d = 1'b1;
-            char_data_d = wb_dat_i[7:0];
+            char_data_d = wb_m2s_i.dat[7:0];
         end
     end
 
@@ -158,9 +143,9 @@ endmodule
 `else  // !VERILATOR
 
 // Stub module for synthesis - active responses but no functionality
-module wb_sim_ctrl #(
-    parameter int unsigned AW       = 32,
-    parameter int unsigned DW       = 32,
+module wb_sim_ctrl
+    import wb_pkg::*;
+#(
     parameter string       LogName  = "sim_out.log",
     parameter bit          FlushOnChar = 1,
     parameter bit          UseFinish   = 0
@@ -168,16 +153,8 @@ module wb_sim_ctrl #(
     input  logic             clk_i,
     input  logic             rst_ni,
 
-    input  logic             wb_cyc_i,
-    input  logic             wb_stb_i,
-    input  logic             wb_we_i,
-    input  logic [AW-1:0]    wb_adr_i,
-    input  logic [DW/8-1:0]  wb_sel_i,
-    input  logic [DW-1:0]    wb_dat_i,
-    output logic [DW-1:0]    wb_dat_o,
-    output logic             wb_ack_o,
-    output logic             wb_err_o,
-    output logic             wb_stall_o,
+    input  wb_m2s_t          wb_m2s_i,
+    output wb_s2m_t          wb_s2m_o,
 
     output logic             sim_halt_o,
     output logic             char_valid_o,
@@ -187,10 +164,7 @@ module wb_sim_ctrl #(
     // Synthesis stub: respond to bus transactions but do nothing
     logic wb_ack_q;
 
-    assign wb_stall_o = 1'b0;
-    assign wb_err_o = 1'b0;
-    assign wb_dat_o = '0;
-    assign wb_ack_o = wb_ack_q;
+    assign wb_s2m_o = '{dat: '0, ack: wb_ack_q, err: 1'b0, stall: 1'b0};
 
     // Tie off simulation outputs
     assign sim_halt_o = 1'b0;
@@ -201,7 +175,7 @@ module wb_sim_ctrl #(
         if (!rst_ni) begin
             wb_ack_q <= 1'b0;
         end else begin
-            wb_ack_q <= wb_cyc_i && wb_stb_i;
+            wb_ack_q <= wb_m2s_i.cyc && wb_m2s_i.stb;
         end
     end
 

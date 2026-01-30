@@ -9,10 +9,9 @@
 // Debug is stubbed out. See docs/plans/ibex_debug_options.md for
 // future debug implementation options.
 
-module ibex_wb_top #(
-    parameter int unsigned AW = 32,
-    parameter int unsigned DW = 32,
-
+module ibex_wb_top
+    import wb_pkg::*;
+#(
     // Ibex configuration
     parameter bit          PMPEnable        = 1'b0,
     parameter int unsigned PMPGranularity   = 0,
@@ -37,28 +36,12 @@ module ibex_wb_top #(
     input  logic [31:0]      boot_addr_i,
 
     // Instruction Wishbone master
-    output logic             ibus_cyc_o,
-    output logic             ibus_stb_o,
-    output logic             ibus_we_o,
-    output logic [AW-1:0]    ibus_adr_o,
-    output logic [DW/8-1:0]  ibus_sel_o,
-    output logic [DW-1:0]    ibus_dat_o,
-    input  logic [DW-1:0]    ibus_dat_i,
-    input  logic             ibus_ack_i,
-    input  logic             ibus_err_i,
-    input  logic             ibus_stall_i,
+    output wb_m2s_t          ibus_m2s_o,
+    input  wb_s2m_t          ibus_s2m_i,
 
     // Data Wishbone master
-    output logic             dbus_cyc_o,
-    output logic             dbus_stb_o,
-    output logic             dbus_we_o,
-    output logic [AW-1:0]    dbus_adr_o,
-    output logic [DW/8-1:0]  dbus_sel_o,
-    output logic [DW-1:0]    dbus_dat_o,
-    input  logic [DW-1:0]    dbus_dat_i,
-    input  logic             dbus_ack_i,
-    input  logic             dbus_err_i,
-    input  logic             dbus_stall_i,
+    output wb_m2s_t          dbus_m2s_o,
+    input  wb_s2m_t          dbus_s2m_i,
 
     // Interrupt inputs
     input  logic             irq_software_i,
@@ -69,7 +52,14 @@ module ibex_wb_top #(
 
     // CPU control
     input  logic             fetch_enable_i,
-    output logic             core_sleep_o
+    output logic             core_sleep_o,
+
+    // CPU status / error outputs
+    output logic             alert_minor_o,
+    output logic             alert_major_internal_o,
+    output logic             alert_major_bus_o,
+    output logic             double_fault_seen_o,
+    output ibex_pkg::crash_dump_t crash_dump_o
 );
 
     // Internal OBI signals for instruction bus
@@ -164,24 +154,21 @@ module ibex_wb_top #(
 
         // Debug - stubbed out
         .debug_req_i     (1'b0),
-        .crash_dump_o    (),
+        .crash_dump_o    (crash_dump_o),
 
         // Double fault
-        .double_fault_seen_o (),
+        .double_fault_seen_o (double_fault_seen_o),
 
         // CPU control
         .fetch_enable_i  (fetch_enable_i ? ibex_pkg::IbexMuBiOn : ibex_pkg::IbexMuBiOff),
-        .alert_minor_o   (),
-        .alert_major_internal_o (),
-        .alert_major_bus_o (),
+        .alert_minor_o   (alert_minor_o),
+        .alert_major_internal_o (alert_major_internal_o),
+        .alert_major_bus_o (alert_major_bus_o),
         .core_sleep_o    (core_sleep_o)
     );
 
     // Instruction bus OBI to Wishbone bridge
-    ibex_obi2wb #(
-        .AW (AW),
-        .DW (DW)
-    ) u_ibus_bridge (
+    ibex_obi2wb u_ibus_bridge (
         .clk_i       (clk_i),
         .rst_ni      (rst_ni),
 
@@ -197,23 +184,12 @@ module ibex_wb_top #(
         .obi_err_o   (instr_err),
 
         // Wishbone
-        .wb_cyc_o    (ibus_cyc_o),
-        .wb_stb_o    (ibus_stb_o),
-        .wb_we_o     (ibus_we_o),
-        .wb_adr_o    (ibus_adr_o),
-        .wb_sel_o    (ibus_sel_o),
-        .wb_dat_o    (ibus_dat_o),
-        .wb_dat_i    (ibus_dat_i),
-        .wb_ack_i    (ibus_ack_i),
-        .wb_err_i    (ibus_err_i),
-        .wb_stall_i  (ibus_stall_i)
+        .wb_m2s_o    (ibus_m2s_o),
+        .wb_s2m_i    (ibus_s2m_i)
     );
 
     // Data bus OBI to Wishbone bridge
-    ibex_obi2wb #(
-        .AW (AW),
-        .DW (DW)
-    ) u_dbus_bridge (
+    ibex_obi2wb u_dbus_bridge (
         .clk_i       (clk_i),
         .rst_ni      (rst_ni),
 
@@ -229,16 +205,8 @@ module ibex_wb_top #(
         .obi_err_o   (data_err),
 
         // Wishbone
-        .wb_cyc_o    (dbus_cyc_o),
-        .wb_stb_o    (dbus_stb_o),
-        .wb_we_o     (dbus_we_o),
-        .wb_adr_o    (dbus_adr_o),
-        .wb_sel_o    (dbus_sel_o),
-        .wb_dat_o    (dbus_dat_o),
-        .wb_dat_i    (dbus_dat_i),
-        .wb_ack_i    (dbus_ack_i),
-        .wb_err_i    (dbus_err_i),
-        .wb_stall_i  (dbus_stall_i)
+        .wb_m2s_o    (dbus_m2s_o),
+        .wb_s2m_i    (dbus_s2m_i)
     );
 
 endmodule

@@ -7,19 +7,18 @@
 // Replaces traditional UART for CPU debug I/O.
 //
 // Features:
-// - TX: Auto-flush on newline, timeout, or threshold
+// - TX: Auto-flush on configurable character, timeout, or threshold
 // - RX: Packet-aware dual-FIFO preserves message boundaries
 // - IRQ support for TX empty and RX packet available
 
 module usb_uart
+    import wb_pkg::*;
     import usb_uart_csr_reg_pkg::*;
 #(
     parameter int unsigned TX_DEPTH   = 64,
     parameter int unsigned RX_DEPTH   = 64,
     parameter int unsigned LEN_DEPTH  = 4,
-    parameter int unsigned CHANNEL_ID = 2,
-    parameter int unsigned AW         = 32,
-    parameter int unsigned DW         = 32
+    parameter int unsigned CHANNEL_ID = 2
 ) (
     input  logic             clk_i,
     input  logic             rst_ni,
@@ -27,16 +26,8 @@ module usb_uart
     // =========================================================================
     // Wishbone Slave Interface
     // =========================================================================
-    input  logic             wb_cyc_i,
-    input  logic             wb_stb_i,
-    input  logic             wb_we_i,
-    input  logic [AW-1:0]    wb_adr_i,
-    input  logic [DW/8-1:0]  wb_sel_i,
-    input  logic [DW-1:0]    wb_dat_i,
-    output logic [DW-1:0]    wb_dat_o,
-    output logic             wb_ack_o,
-    output logic             wb_err_o,
-    output logic             wb_stall_o,
+    input  wb_m2s_t          wb_m2s_i,
+    output wb_s2m_t          wb_s2m_o,
 
     // =========================================================================
     // USB TX Stream (usb_channel_description sink - to host)
@@ -71,9 +62,9 @@ module usb_uart
     // Simple bus interface (between wb2simple and CSR block)
     logic             reg_we;
     logic             reg_re;
-    logic [AW-1:0]    reg_addr;
-    logic [DW-1:0]    reg_wdata;
-    logic [DW-1:0]    reg_rdata;
+    logic [31:0]      reg_addr;
+    logic [31:0]      reg_wdata;
+    logic [31:0]      reg_rdata;
 
     // Hardware interface structs
     usb_uart_csr_reg2hw_t reg2hw;
@@ -93,40 +84,31 @@ module usb_uart
     logic             rx_valid;
     logic             rx_full;
     logic [3:0]       rx_packets;
+    logic             rx_data_overflow;
+    logic             rx_len_overflow;
 
     // Control signals from CSR
     logic             tx_en;
     logic             rx_en;
-    logic             nl_flush_en;
+    logic             char_flush_en;
     logic             timeout_flush_en;
     logic             thresh_flush_en;
     logic             sw_tx_flush;
     logic             sw_rx_flush;
-    logic             irq_rx_en;
-    logic             irq_tx_empty_en;
+    logic             sw_tx_clear;
     logic [31:0]      flush_timeout;
     logic [7:0]       flush_thresh;
+    logic [7:0]       flush_char;
 
     // =========================================================================
     // Wishbone to Simple Bus Adapter
     // =========================================================================
 
-    wb2simple #(
-        .AW (AW),
-        .DW (DW)
-    ) u_wb2simple (
+    wb2simple u_wb2simple (
         .clk_i      (clk_i),
         .rst_ni     (rst_ni),
-        .wb_cyc_i   (wb_cyc_i),
-        .wb_stb_i   (wb_stb_i),
-        .wb_we_i    (wb_we_i),
-        .wb_adr_i   (wb_adr_i),
-        .wb_sel_i   (wb_sel_i),
-        .wb_dat_i   (wb_dat_i),
-        .wb_dat_o   (wb_dat_o),
-        .wb_ack_o   (wb_ack_o),
-        .wb_err_o   (wb_err_o),
-        .wb_stall_o (wb_stall_o),
+        .wb_m2s_i   (wb_m2s_i),
+        .wb_s2m_o   (wb_s2m_o),
         .reg_we     (reg_we),
         .reg_re     (reg_re),
         .reg_addr   (reg_addr),
@@ -159,15 +141,15 @@ module usb_uart
     // Control signals from registers
     assign tx_en            = reg2hw.ctrl.tx_en.q;
     assign rx_en            = reg2hw.ctrl.rx_en.q;
-    assign nl_flush_en      = reg2hw.ctrl.nl_flush_en.q;
+    assign char_flush_en    = reg2hw.ctrl.char_flush_en.q;
     assign timeout_flush_en = reg2hw.ctrl.timeout_flush_en.q;
     assign thresh_flush_en  = reg2hw.ctrl.thresh_flush_en.q;
     assign sw_tx_flush      = reg2hw.ctrl.tx_flush.q;
     assign sw_rx_flush      = reg2hw.ctrl.rx_flush.q;
-    assign irq_rx_en        = reg2hw.ctrl.irq_rx_en.q;
-    assign irq_tx_empty_en  = reg2hw.ctrl.irq_tx_empty_en.q;
+    assign sw_tx_clear      = reg2hw.ctrl.tx_clear.q;
     assign flush_timeout    = reg2hw.timeout.q;
     assign flush_thresh     = reg2hw.thresh.q;
+    assign flush_char       = reg2hw.flush_char.q;
 
     // TX_DATA: CPU writes trigger FIFO write
     assign tx_wr_valid = reg_we && (reg_addr[BlockAw-1:0] == USB_UART_CSR_TX_DATA_OFFSET);
@@ -208,7 +190,9 @@ module usb_uart
         .tx_last_o          (tx_last_o),
         .enable_i           (tx_en),
         .sw_flush_i         (sw_tx_flush),
-        .nl_flush_en_i      (nl_flush_en),
+        .sw_clear_i         (sw_tx_clear),
+        .char_flush_en_i    (char_flush_en),
+        .flush_char_i       (flush_char),
         .timeout_flush_en_i (timeout_flush_en),
         .thresh_flush_en_i  (thresh_flush_en),
         .flush_timeout_i    (flush_timeout),
@@ -226,40 +210,73 @@ module usb_uart
         .DATA_DEPTH (RX_DEPTH),
         .LEN_DEPTH  (LEN_DEPTH)
     ) u_rx_fifo (
-        .clk_i          (clk_i),
-        .rst_ni         (rst_ni),
-        .rx_valid_i     (rx_valid_i),
-        .rx_ready_o     (rx_ready_o),
-        .rx_data_i      (rx_data_i),
-        .rx_length_i    (rx_length_i),
-        .rx_last_i      (rx_last_i),
-        .cpu_rd_req_i   (rx_rd_req),
-        .cpu_rd_data_o  (rx_rd_data),
-        .cpu_rx_len_o   (rx_len),
-        .enable_i       (rx_en),
-        .sw_flush_i     (sw_rx_flush),
-        .rx_valid_o     (rx_valid),
-        .rx_full_o      (rx_full),
-        .rx_packets_o   (rx_packets)
+        .clk_i            (clk_i),
+        .rst_ni           (rst_ni),
+        .rx_valid_i       (rx_valid_i),
+        .rx_ready_o       (rx_ready_o),
+        .rx_data_i        (rx_data_i),
+        .rx_length_i      (rx_length_i),
+        .rx_last_i        (rx_last_i),
+        .cpu_rd_req_i     (rx_rd_req),
+        .cpu_rd_data_o    (rx_rd_data),
+        .cpu_rx_len_o     (rx_len),
+        .enable_i         (rx_en),
+        .sw_flush_i       (sw_rx_flush),
+        .rx_valid_o       (rx_valid),
+        .rx_full_o        (rx_full),
+        .rx_packets_o     (rx_packets),
+        .data_overflow_o  (rx_data_overflow),
+        .len_overflow_o   (rx_len_overflow)
     );
 
     // =========================================================================
     // IRQ Generation
     // =========================================================================
 
-    logic irq_rx;
-    logic irq_tx_empty;
+    // Edge detection for level signals (rx_valid, tx_empty)
+    logic rx_valid_prev, tx_empty_prev;
 
-    assign irq_rx       = irq_rx_en && rx_valid;
-    assign irq_tx_empty = irq_tx_empty_en && tx_empty;
+    always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin
+            rx_valid_prev <= 1'b0;
+            tx_empty_prev <= 1'b1;  // TX starts empty
+        end else begin
+            rx_valid_prev <= rx_valid;
+            tx_empty_prev <= tx_empty;
+        end
+    end
 
-    assign irq_o = irq_rx || irq_tx_empty;
+    logic rx_valid_rising, tx_empty_rising;
+    assign rx_valid_rising = rx_valid && !rx_valid_prev;
+    assign tx_empty_rising = tx_empty && !tx_empty_prev;
+
+    // IRQ status sticky bits (set by HW pulse, cleared by SW writing 1)
+    assign hw2reg.irq_status.rx_valid.d      = 1'b1;
+    assign hw2reg.irq_status.rx_valid.de     = rx_valid_rising;
+    assign hw2reg.irq_status.tx_empty.d      = 1'b1;
+    assign hw2reg.irq_status.tx_empty.de     = tx_empty_rising;
+    assign hw2reg.irq_status.rx_overflow.d   = 1'b1;
+    assign hw2reg.irq_status.rx_overflow.de  = rx_data_overflow;
+    assign hw2reg.irq_status.len_overflow.d  = 1'b1;
+    assign hw2reg.irq_status.len_overflow.de = rx_len_overflow;
+
+    // IRQ output: OR of (status & enable)
+    logic [3:0] irq_status_q, irq_enable_q;
+    assign irq_status_q = {reg2hw.irq_status.len_overflow.q,
+                            reg2hw.irq_status.rx_overflow.q,
+                            reg2hw.irq_status.tx_empty.q,
+                            reg2hw.irq_status.rx_valid.q};
+    assign irq_enable_q = {reg2hw.irq_enable.len_overflow.q,
+                            reg2hw.irq_enable.rx_overflow.q,
+                            reg2hw.irq_enable.tx_empty.q,
+                            reg2hw.irq_enable.rx_valid.q};
+    assign irq_o = |(irq_status_q & irq_enable_q);
 
     // =========================================================================
     // Unused Signal Handling
     // =========================================================================
 
     logic unused;
-    assign unused = &{rx_dst_i, reg_addr[AW-1:BlockAw], reg2hw.tx_data};
+    assign unused = &{rx_dst_i, reg_addr[31:BlockAw], reg2hw.tx_data};
 
 endmodule

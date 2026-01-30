@@ -6,7 +6,7 @@ usage() {
     echo "Usage: source sourceme [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -c, --clean    Remove the virtual environment"
+    echo "  -c, --clean    Remove and recreate the virtual environment"
     echo "  -h, --help     Show this help message"
 }
 
@@ -46,10 +46,8 @@ fi
 if [ -d "$VENV_DIR" ]; then
     echo "Virtual environment already exists, activating..."
 else
-    echo "Creating virtual environment with uv..."
-    uv venv "$VENV_DIR"
-    echo "Installing dependencies..."
-    uv pip install fusesoc
+    echo "Creating virtual environment and installing dependencies..."
+    uv sync
 fi
 
 source "$VENV_DIR/bin/activate"

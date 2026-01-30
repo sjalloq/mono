@@ -9,10 +9,7 @@
 module wb_crossbar_arbiter
   import wb_crossbar_pkg::*;
 #(
-  parameter int unsigned NumMasters = 2,
-  parameter int unsigned AddrWidth  = 32,
-  parameter int unsigned DataWidth  = 32,
-  localparam int unsigned SelWidth  = DataWidth / 8
+  parameter int unsigned NumMasters = 2
 ) (
   input  logic                                    clk_i,
   input  logic                                    rst_ni,
@@ -22,9 +19,9 @@ module wb_crossbar_arbiter
   input  logic [NumMasters-1:0]                   cyc_i,
   input  logic [NumMasters-1:0]                   stb_i,
   input  logic [NumMasters-1:0]                   we_i,
-  input  logic [NumMasters-1:0][AddrWidth-1:0]    adr_i,
-  input  logic [NumMasters-1:0][SelWidth-1:0]     sel_i,
-  input  logic [NumMasters-1:0][DataWidth-1:0]    wdat_i,
+  input  logic [NumMasters-1:0][31:0]             adr_i,
+  input  logic [NumMasters-1:0][3:0]              sel_i,
+  input  logic [NumMasters-1:0][31:0]             wdat_i,
 
   // To decoders
   output logic [NumMasters-1:0]                   stall_o,
@@ -33,9 +30,9 @@ module wb_crossbar_arbiter
   output logic                                    cyc_o,
   output logic                                    stb_o,
   output logic                                    we_o,
-  output logic [AddrWidth-1:0]                    adr_o,
-  output logic [SelWidth-1:0]                     sel_o,
-  output logic [DataWidth-1:0]                    wdat_o,
+  output logic [31:0]                             adr_o,
+  output logic [3:0]                              sel_o,
+  output logic [31:0]                             wdat_o,
 
   // From slave
   input  logic                                    ack_i,

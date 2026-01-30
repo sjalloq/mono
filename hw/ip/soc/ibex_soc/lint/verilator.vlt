@@ -19,18 +19,16 @@ lint_off -rule UNOPTFLAT -file "*/wb_crossbar.sv"
 // Standard arbiter design - no internal feedback loops.
 lint_off -rule UNOPTFLAT -file "*/wb_crossbar_arbiter.sv"
 
-// Unused address bits: 32-bit bus but smaller memory regions
-// TCM only uses bits needed for its depth
-lint_off -rule UNUSEDSIGNAL -file "*/wb_tcm.sv" -match "*wb_adr_i*"
+// Unused struct fields: modules only use subset of wb_m2s_i fields
+// TCM only uses address bits needed for its depth
+lint_off -rule UNUSEDSIGNAL -file "*/wb_tcm.sv" -match "*wb_m2s_i*"
 
 // Timer only uses bits needed for register decode
-lint_off -rule UNUSEDSIGNAL -file "*/wb_timer.sv" -match "*wb_adr_i*"
+lint_off -rule UNUSEDSIGNAL -file "*/wb_timer.sv" -match "*wb_m2s_i*"
 
 // SimCtrl only uses bits [3:2] of address for register decode
 // Only uses sel[0] and dat[7:0] for character output
-lint_off -rule UNUSEDSIGNAL -file "*/wb_sim_ctrl.sv" -match "*wb_adr_i*"
-lint_off -rule UNUSEDSIGNAL -file "*/wb_sim_ctrl.sv" -match "*wb_sel_i*"
-lint_off -rule UNUSEDSIGNAL -file "*/wb_sim_ctrl.sv" -match "*wb_dat_i*"
+lint_off -rule UNUSEDSIGNAL -file "*/wb_sim_ctrl.sv" -match "*wb_m2s_i*"
 
 // Width expansions from smaller constants to bus widths are expected
 lint_off -rule WIDTHEXPAND -file "*/ibex_*.sv"
@@ -39,3 +37,12 @@ lint_off -rule WIDTHEXPAND -file "*/ibex_*.sv"
 // These are Ibex third-party code issues, not configurable
 lint_off -rule UNUSEDPARAM -file "*/ibex_register_file_fpga.sv"
 lint_off -rule UNUSEDSIGNAL -file "*/ibex_register_file_fpga.sv"
+
+// External slave input port is unused when NumExtSlaves==0 (the default).
+// The port exists for parent modules to connect external Wishbone slaves.
+lint_off -rule UNUSEDSIGNAL -file "*/ibex_soc_top.sv" -match "Signal is not used: 'ext_wb_s2m_i'"
+
+// Unsigned loop comparisons against NumExtSlaves are constant when the
+// parameter defaults to 0. This is expected for parameterized external
+// slave support - the loops are dead code when no external slaves exist.
+lint_off -rule UNSIGNED -file "*/ibex_soc_top.sv"

@@ -45,3 +45,5 @@ targets:
         verilator_options:
           - --trace
           - --trace-fst
+          - --timing
+          - -Wno-INITIALDLY

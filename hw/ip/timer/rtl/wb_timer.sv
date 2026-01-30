@@ -13,24 +13,15 @@
 //   0x0C: mtimecmp_hi  (R/W) - Upper 32 bits of mtimecmp
 //   0x10: prescaler    (R/W) - Clock prescaler (mtime increments every prescaler+1 cycles)
 
-module wb_timer #(
-    parameter int unsigned AW = 32,
-    parameter int unsigned DW = 32
-) (
+module wb_timer
+    import wb_pkg::*;
+(
     input  logic             clk_i,
     input  logic             rst_ni,
 
-    // Wishbone slave interface
-    input  logic             wb_cyc_i,
-    input  logic             wb_stb_i,
-    input  logic             wb_we_i,
-    input  logic [AW-1:0]    wb_adr_i,
-    input  logic [DW/8-1:0]  wb_sel_i,
-    input  logic [DW-1:0]    wb_dat_i,
-    output logic [DW-1:0]    wb_dat_o,
-    output logic             wb_ack_o,
-    output logic             wb_err_o,
-    output logic             wb_stall_o,
+    // Wishbone pipelined slave interface
+    input  wb_m2s_t          wb_m2s_i,
+    output wb_s2m_t          wb_s2m_o,
 
     // Timer interrupt output
     output logic             timer_irq_o
@@ -50,20 +41,17 @@ module wb_timer #(
     logic [31:0] prescaler_cnt_d, prescaler_cnt_q;
 
     // Wishbone output registers
-    logic [DW-1:0] wb_dat_d, wb_dat_q;
-    logic          wb_ack_d, wb_ack_q;
-    logic          wb_err_d, wb_err_q;
+    logic [31:0] wb_dat_d, wb_dat_q;
+    logic        wb_ack_d, wb_ack_q;
+    logic        wb_err_d, wb_err_q;
 
     // Word address
     logic [3:0] word_addr;
-    assign word_addr = wb_adr_i[5:2];
+    assign word_addr = wb_m2s_i.adr[5:2];
 
     // Valid access
     logic valid_access;
-    assign valid_access = wb_cyc_i && wb_stb_i;
-
-    // Pipelined: never stall
-    assign wb_stall_o = 1'b0;
+    assign valid_access = wb_m2s_i.cyc && wb_m2s_i.stb;
 
     // Timer tick (when prescaler counter wraps)
     logic timer_tick;
@@ -91,16 +79,16 @@ module wb_timer #(
         end
 
         // mtime counter logic
-        if (valid_access && wb_we_i) begin
+        if (valid_access && wb_m2s_i.we) begin
             case (word_addr)
                 ADDR_MTIME_LO: begin
                     for (int i = 0; i < 4; i++) begin
-                        if (wb_sel_i[i]) mtime_d[i*8 +: 8] = wb_dat_i[i*8 +: 8];
+                        if (wb_m2s_i.sel[i]) mtime_d[i*8 +: 8] = wb_m2s_i.dat[i*8 +: 8];
                     end
                 end
                 ADDR_MTIME_HI: begin
                     for (int i = 0; i < 4; i++) begin
-                        if (wb_sel_i[i]) mtime_d[32 + i*8 +: 8] = wb_dat_i[i*8 +: 8];
+                        if (wb_m2s_i.sel[i]) mtime_d[32 + i*8 +: 8] = wb_m2s_i.dat[i*8 +: 8];
                     end
                 end
                 default: ;
@@ -110,16 +98,16 @@ module wb_timer #(
         end
 
         // mtimecmp register logic
-        if (valid_access && wb_we_i) begin
+        if (valid_access && wb_m2s_i.we) begin
             case (word_addr)
                 ADDR_MTIMECMP_LO: begin
                     for (int i = 0; i < 4; i++) begin
-                        if (wb_sel_i[i]) mtimecmp_d[i*8 +: 8] = wb_dat_i[i*8 +: 8];
+                        if (wb_m2s_i.sel[i]) mtimecmp_d[i*8 +: 8] = wb_m2s_i.dat[i*8 +: 8];
                     end
                 end
                 ADDR_MTIMECMP_HI: begin
                     for (int i = 0; i < 4; i++) begin
-                        if (wb_sel_i[i]) mtimecmp_d[32 + i*8 +: 8] = wb_dat_i[i*8 +: 8];
+                        if (wb_m2s_i.sel[i]) mtimecmp_d[32 + i*8 +: 8] = wb_m2s_i.dat[i*8 +: 8];
                     end
                 end
                 default: ;
@@ -127,16 +115,16 @@ module wb_timer #(
         end
 
         // Prescaler register logic
-        if (valid_access && wb_we_i && word_addr == ADDR_PRESCALER) begin
+        if (valid_access && wb_m2s_i.we && word_addr == ADDR_PRESCALER) begin
             for (int i = 0; i < 4; i++) begin
-                if (wb_sel_i[i]) prescaler_d[i*8 +: 8] = wb_dat_i[i*8 +: 8];
+                if (wb_m2s_i.sel[i]) prescaler_d[i*8 +: 8] = wb_m2s_i.dat[i*8 +: 8];
             end
         end
 
         // Wishbone response logic
         wb_ack_d = valid_access;
 
-        if (valid_access && !wb_we_i) begin
+        if (valid_access && !wb_m2s_i.we) begin
             case (word_addr)
                 ADDR_MTIME_LO:    wb_dat_d = mtime_q[31:0];
                 ADDR_MTIME_HI:    wb_dat_d = mtime_q[63:32];
@@ -170,8 +158,6 @@ module wb_timer #(
     end
 
     // Output assignments
-    assign wb_dat_o = wb_dat_q;
-    assign wb_ack_o = wb_ack_q;
-    assign wb_err_o = wb_err_q;
+    assign wb_s2m_o = '{dat: wb_dat_q, ack: wb_ack_q, err: wb_err_q, stall: 1'b0};
 
 endmodule

@@ -5,6 +5,7 @@ description: Tightly Coupled Memory with Wishbone pipelined interface
 filesets:
   rtl:
     depend:
+      - mono:ip:wb_pkg
       - lowrisc:prim:util_memload
     files:
       - rtl/wb_tcm.sv

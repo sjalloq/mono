@@ -5,6 +5,7 @@ description: Ibex RISC-V SoC with Wishbone bus and USB Etherbone host interface
 filesets:
   rtl:
     depend:
+      - mono:ip:wb_pkg
       - mono:ip:ibex_wb
       - mono:ip:wb_crossbar
       - mono:ip:tcm

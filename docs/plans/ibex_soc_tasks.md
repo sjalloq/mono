@@ -13,6 +13,7 @@
 | 7 | Hardware bringup | ⏳ Pending | Squirrel board |
 | 8 | SystemRDL registers | ⏳ Pending | Future: proper CSR generation |
 | 9 | Rust/Embassy support | ⏳ Pending | Future: depends on SystemRDL |
+| 10 | GPIO peripheral | ✅ Done | Standalone IP with per-bit ops + interrupts |
 
 ---
 
@@ -29,7 +30,10 @@
 | Ibex WB Wrapper | `hw/ip/cpu/ibex/rtl/ibex_wb_top.sv` |
 | FT601 PHY | `hw/ip/usb/ft601/rtl/ft601_sync.sv` |
 | SimCtrl | `hw/ip/sim/sim_ctrl/rtl/wb_sim_ctrl.sv` |
+| USB Subsystem | `hw/projects/squirrel/ibex_soc/rtl/usb_subsystem.sv` |
 | SoC Top Level | `hw/ip/soc/ibex_soc/rtl/ibex_soc_top.sv` |
+| GPIO Peripheral | `hw/ip/gpio/rtl/gpio.sv` |
+| Core Level | `hw/projects/squirrel/ibex_soc/rtl/core.sv` |
 | Board Top Level | `hw/projects/squirrel/ibex_soc/rtl/squirrel_ibex_top.sv` |
 | C Toolchain | `sw/device/ibex_soc/` (linker, crt0, HAL) |
 
@@ -72,13 +76,16 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 
 ## Memory Map
 
-| Region | Base | Size | Description |
-|--------|------|------|-------------|
-| ITCM | `0x0001_0000` | 16KB | Instruction memory |
-| DTCM | `0x0002_0000` | 16KB | Data memory |
-| Timer | `0x1000_0000` | 4KB | RISC-V timer |
-| SimCtrl | `0x1000_1000` | 4KB | Simulation control (printf + halt) |
-| USB UART | `0x1000_2000` | 4KB | CPU-to-host UART over USB (Channel 2) |
+Peripherals are auto-assigned consecutive 4K windows from `PeriphBase = 0x1000_0000`.
+No overlap is possible by construction. External slaves continue the sequence.
+
+| Region | Base | Size | Type | Slot |
+|--------|------|------|------|------|
+| ITCM | `0x0001_0000` | 16KB | Memory | — |
+| DTCM | `0x0002_0000` | 16KB | Memory | — |
+| Timer | `0x1000_0000` | 4KB | Peripheral | 0 |
+| SimCtrl | `0x1000_1000` | 4KB | Peripheral | 1 |
+| USB UART | `0x1000_2000` | 4KB | Peripheral (ext) | 2 |
 
 ---
 
@@ -258,9 +265,9 @@ Both ibus and dbus can access ITCM (required for `.rodata`/constant loads via D-
 **Dependencies:** Task 6 (validated in simulation first)
 
 **Files:**
-- `docs/rdl/usb_uart.rdl` - SystemRDL register definition
-- `hw/ip/usb/usb_uart/rtl/wb_usb_uart.sv` - USB UART peripheral
-- `hw/ip/usb/usb_uart/usb_uart.core` - FuseSoC core file
+- `hw/ip/usb/uart/rdl/usb_uart_csr.rdl` - SystemRDL register definition
+- `hw/ip/usb/uart/rtl/usb_uart.sv` - USB UART peripheral
+- `hw/ip/usb/uart/usb_uart.core` - FuseSoC core file
 - `sw/device/ibex_soc/lib/usb_uart.c` - HAL driver
 
 ---
@@ -337,6 +344,103 @@ Task 8 (SystemRDL) ─► Task 9 (Rust)
 ---
 
 ## Work Log
+
+### 2026-01-29: Move crossbar address map from parameters to input ports
+
+**Work completed:**
+- Moved `AddrBase`/`AddrMask` from parameters to input ports (`cfg_addr_base_i`/`cfg_addr_mask_i`) on `wb_crossbar` and `wb_crossbar_decoder`
+- Replaced `getSlaveAddrs()`/`getSlaveMasks()` functions in `ibex_soc_top` with simple `assign` statements and a `genvar` loop for peripheral addresses
+- Crossbar address map is now configured via port connections instead of compile-time parameters, following the Ibex demo system pattern
+
+**Files modified:**
+- `hw/ip/bus/wb_crossbar/rtl/wb_crossbar_decoder.sv` — Removed `AddrBase`/`AddrMask` parameters, added `cfg_addr_base_i`/`cfg_addr_mask_i` input ports, updated address decode logic
+- `hw/ip/bus/wb_crossbar/rtl/wb_crossbar.sv` — Same parameter-to-port change, pass through to decoder instances
+- `hw/ip/soc/ibex_soc/rtl/ibex_soc_top.sv` — Replaced functions with `assign` statements and `genvar` loop, updated crossbar instantiation to use port connections
+- `docs/plans/ibex_soc_tasks.md` — Added work log entry
+
+**Lint status:** PASS (`mono:ip:ibex_soc`)
+
+---
+
+### 2026-01-29: Fixed 4K Peripheral Address Windows
+
+**Work completed:**
+- Formalized peripheral address assignment: all peripherals get consecutive 4K windows from `PeriphBase = 0x1000_0000`
+- Split slaves into two categories: memories (ITCM, DTCM) with configurable base/mask, and peripherals with auto-assigned addresses
+- Added `PeriphBase`, `PeriphMask`, `NumMemSlaves`, `NumIntPeriphs`, peripheral slot indices (`PeriphTimer`, `PeriphSimCtrl`)
+- Derived `TimerBase` and `SimCtrlBase` from slot formula (values unchanged: `0x1000_0000`, `0x1000_1000`)
+- Removed `TimerSize`, `TimerMask`, `SimCtrlSize`, `SimCtrlMask` (replaced by shared `PeriphMask`)
+- Removed `ExtSlaveBase` and `ExtSlaveMask` parameters from `ibex_soc_top` — external slaves now auto-assigned from slot `NumIntPeriphs` onward
+- Removed `getSlaveAddrs()`/`getSlaveMasks()` from package, consolidated into single pair of functions in `ibex_soc_top`
+- Functions loop over all peripherals (internal + external) in one pass: `PeriphBase + i * 0x1000`
+- No overlap possible by construction
+
+**Files modified:**
+- `hw/ip/soc/ibex_soc/rtl/ibex_soc_pkg.sv` — Restructured parameters, loop-based address/mask functions
+- `hw/ip/soc/ibex_soc/rtl/ibex_soc_top.sv` — Removed ExtSlaveBase/ExtSlaveMask, auto-assign external peripheral addresses
+- `docs/plans/ibex_soc_tasks.md` — Updated memory map table, added work log
+
+**Lint status:** PASS (`mono:ip:ibex_soc`)
+
+---
+
+### 2026-01-29: Proper Interrupt Registers for USB UART
+
+**Work completed:**
+- Moved overflow bits (`rx_overflow`, `len_overflow`) from `status` register to new `irq_status` register
+- Moved IRQ enables (`irq_rx_en`, `irq_tx_empty_en`) from `ctrl` register to new `irq_enable` register
+- Added `irq_status` (0x20) — 4-bit W1C sticky event flags with HW set via `de` pulse
+- Added `irq_enable` (0x24) — 4-bit RW mask, `irq_o = |(irq_status & irq_enable)`
+- Added rising-edge detection for `rx_valid` and `tx_empty` level signals
+- `status` register is now purely read-only (bits [11:0] only)
+- `ctrl` register reduced to bits [7:0] (no IRQ enables)
+- Regenerated CSR files from updated RDL (BlockAw increased from 5 to 6)
+
+**Files modified:**
+- `hw/ip/usb/uart/rdl/usb_uart_csr.rdl` — Removed overflow/IRQ fields, added irq_status and irq_enable registers
+- `hw/ip/usb/uart/rtl/usb_uart.sv` — Edge detect logic, irq_status/irq_enable wiring, new IRQ output
+- `hw/ip/usb/uart/rtl/usb_uart_csr_reg_pkg.sv` — Regenerated
+- `hw/ip/usb/uart/rtl/usb_uart_csr_reg_top.sv` — Regenerated
+- `docs/source/usb/usb_uart.rst` — Updated register docs, memory map, interrupt behavior
+
+**Lint status:** PASS
+
+---
+
+### 2026-01-29: USB UART Reorganization and Feature Additions
+
+**Work completed:**
+- Deleted `hw/ip/usb_bridge/` (superseded by usb_uart)
+- Moved `hw/ip/usb_uart/` to `hw/ip/usb/uart/`
+- Added configurable `flush_char` register at 0x1C (default 0x0A = newline)
+- Renamed `nl_flush_en` to `char_flush_en` throughout RDL and RTL
+- Added RX overflow tracking: sticky W1C bits `rx_overflow` [16] and `len_overflow` [17] in status register
+- Added `tx_clear` singlepulse at ctrl[7] for TX FIFO discard/reset
+- Regenerated CSR files from updated RDL
+- Updated docs and task plan file paths
+- Fixed peakrdl-sv `pkg_resources` dependency (replaced with `importlib.resources`)
+- Updated `sourceme` to use `uv sync` instead of manual pip install
+- Updated `pyproject.toml` to pin peakrdl-sv at tag 0.1.0
+
+**Files deleted:**
+- `hw/ip/usb_bridge/` (entire directory)
+
+**Files moved:**
+- `hw/ip/usb_uart/*` → `hw/ip/usb/uart/*`
+
+**Files modified:**
+- `hw/ip/usb/uart/rdl/usb_uart_csr.rdl` - flush_char, overflow bits, tx_clear, nl→char rename
+- `hw/ip/usb/uart/rtl/usb_uart.sv` - Wire new CSR fields, overflow signals, tx_clear
+- `hw/ip/usb/uart/rtl/usb_uart_tx_fifo.sv` - Configurable flush char, sw_clear input
+- `hw/ip/usb/uart/rtl/usb_uart_rx_fifo.sv` - Overflow output signals
+- `hw/ip/usb/uart/rtl/usb_uart_csr_reg_pkg.sv` - Regenerated
+- `hw/ip/usb/uart/rtl/usb_uart_csr_reg_top.sv` - Regenerated
+- `docs/source/usb/usb_uart.rst` - Updated file paths, tx_clear in ctrl
+- `docs/plans/ibex_soc_tasks.md` - Updated file paths in Task 7
+- `sourceme` - Use `uv sync`
+- `pyproject.toml` - Pin peakrdl-sv@0.1.0
+
+---
 
 ### 2026-01-27: USB UART Channel Specification
 
@@ -509,3 +613,136 @@ Task 8 (SystemRDL) ─► Task 9 (Rust)
 4. **FuseSoC must run from repo root**: Added instructions to CLAUDE.md.
 
 **Lint status:** PASS (with documented waivers)
+
+---
+
+### 2026-01-29: USB Subsystem + Squirrel core/top Hierarchy
+
+**Work completed:**
+- Created `usb_subsystem.sv` integrating USB Core (Migen-generated) with USB UART peripheral
+- Channel assignment: ch0 = USB UART (CHANNEL_ID=0), ch1 = Etherbone (tied off, future)
+- Etherbone WB master port exists but is tied to `'0` for now
+- Restructured Squirrel board hierarchy: `squirrel_ibex_top` (Xilinx prims) -> `core` (functional logic)
+- `squirrel_ibex_top` now contains only: MMCM, BUFG, POR SRL16E, reset synchronizer, FT601 IOBUFs
+- `core.sv` now contains: FT601 PHY, USB subsystem, Ibex SoC (NumExtSlaves=1), LED heartbeat
+- USB UART connected to ibex_soc ext_wb port (address `0x1000_2000`)
+- FT601 ports uncommented in top-level (no longer commented out)
+- Added `-Wno-MODMISSING` to project lint target for Xilinx primitives
+
+**Known limitations:**
+- ~~No CDC between FT601 and USB subsystem~~ — Fixed: async FIFOs added (2026-01-30)
+- USB UART IRQ not yet connected to CPU interrupt controller
+
+**Files created:**
+- `hw/projects/squirrel/ibex_soc/rtl/usb_subsystem.sv` — Project-specific USB subsystem glue (not a reusable IP — channel assignment and tie-offs are board-specific)
+
+**Files modified:**
+- `hw/projects/squirrel/ibex_soc/rtl/squirrel_ibex_top.sv` — Replaced ibex_soc_top with core, added IOBUFs, uncommented FT601 ports
+- `hw/projects/squirrel/ibex_soc/rtl/core.sv` — Major rework: ft601_sync + usb_subsystem + ibex_soc_top
+- `hw/projects/squirrel/ibex_soc/project.core` — Added ft601, usb_core, usb_uart, wb_pkg deps, added core.sv + usb_subsystem.sv, -Wno-MODMISSING
+- `hw/projects/squirrel/ibex_soc/lint/verilator.vlt` — Updated waivers for new hierarchy (includes Migen usb_core.v waivers)
+- `docs/plans/ibex_soc_tasks.md` — Updated infrastructure table, added work log
+
+**Lint status:** PASS (`mono:ip:usb_subsystem`, `mono:projects:squirrel_ibex_soc`, `mono:ip:ibex_soc`)
+
+---
+
+### 2026-01-29: Convert all Wishbone interfaces to wb_pkg structs
+
+**Work completed:**
+- Converted all module Wishbone ports from individual signals to `wb_m2s_t`/`wb_s2m_t` structs from `wb_pkg`
+- Bottom-up approach: leaf slaves/bridges first, then crossbar, then integration modules
+- Crossbar internal logic (transpose, decode, arbitrate) keeps individual signals; structs are unpacked/repacked at module boundaries via generate loops
+- Removed `AW`/`DW`/`Width`/`AddrWidth`/`DataWidth`/`SelWidth` parameters from all converted modules (fixed at 32-bit by struct definition)
+- `ibex_soc_top` massively simplified: ~45 lines of signal declarations and assign statements replaced with 4 struct array declarations and direct connections
+
+**Layer 1 (leaf slaves/bridges):**
+- `hw/ip/mem/tcm/rtl/wb_tcm.sv` — Slave: struct ports, removed `Width` parameter, struct output assignment
+- `hw/ip/timer/rtl/wb_timer.sv` — Slave: struct ports, removed `AW`/`DW` parameters
+- `hw/ip/sim/sim_ctrl/rtl/wb_sim_ctrl.sv` — Slave: both VERILATOR and synthesis stubs converted, removed `AW`/`DW`
+- `hw/ip/csr/rtl/wb2simple.sv` — Adapter: struct WB ports, simple bus side unchanged, removed `AW`/`DW`
+- `hw/ip/usb/uart/rtl/usb_uart.sv` — Slave: struct ports, removed `AW`/`DW`, passes struct to `wb2simple`
+- `hw/ip/cpu/ibex/rtl/ibex_obi2wb.sv` — Master bridge: struct WB ports, removed `AW`/`DW`
+- `hw/ip/cpu/ibex/rtl/ibex_wb_top.sv` — Dual master wrapper: struct ports, removed `AW`/`DW`
+
+**Layer 2 (crossbar):**
+- `hw/ip/bus/wb_crossbar/rtl/wb_crossbar.sv` — Struct array ports with unpack/repack generate loops, removed `AddrWidth`/`DataWidth`
+- `hw/ip/bus/wb_crossbar/rtl/wb_crossbar_decoder.sv` — Removed `AddrWidth`/`DataWidth`/`SelWidth`, hardcoded to 32-bit
+- `hw/ip/bus/wb_crossbar/rtl/wb_crossbar_arbiter.sv` — Removed `AddrWidth`/`DataWidth`/`SelWidth`, hardcoded to 32-bit
+
+**Layer 3 (integration):**
+- `hw/ip/soc/ibex_soc/rtl/ibex_soc_top.sv` — Direct struct array connections between CPU, crossbar, and slaves
+- `hw/projects/squirrel/ibex_soc/rtl/usb_subsystem.sv` — Pass struct directly to `usb_uart` (no manual unpack)
+
+**FuseSoC core files — added `mono:ip:wb_pkg` dependency:**
+- `hw/ip/bus/wb_crossbar/wb_crossbar.core`
+- `hw/ip/mem/tcm/tcm.core`
+- `hw/ip/timer/timer.core`
+- `hw/ip/sim/sim_ctrl/sim_ctrl.core`
+- `hw/ip/csr/csr.core`
+- `hw/ip/cpu/ibex/ibex.core`
+
+**Lint waivers:**
+- `hw/ip/soc/ibex_soc/lint/verilator.vlt` — Updated signal name matches from `wb_adr_i`/`wb_sel_i`/`wb_dat_i` to `wb_m2s_i`
+
+**Lint status:** PASS (`mono:ip:wb_crossbar`, `mono:ip:ibex_soc`, `mono:ip:usb_uart`, `mono:projects:squirrel_ibex_soc`)
+
+### 2026-01-29: GPIO Peripheral Implementation
+
+**Work completed:**
+- Created standalone GPIO peripheral at `hw/ip/gpio/` with PeakRDL-generated CSR block
+- Standard CSR registers: GPIO_OUT (external), GPIO_OE, GPIO_IN (external), GPIO_IE, IRQ_STATUS (W1C), IRQ_ENABLE, IRQ_EDGE, IRQ_TYPE
+- Per-bit atomic operations via address-decoded write regions: SET (0x100), CLEAR (0x180), TOGGLE (0x200)
+- GPIO_OUT storage lives in `gpio_bit_ctrl.sv` (external to PeakRDL) for unified direct/per-bit access
+- 2-stage input synchronizer with configurable input enable masking
+- Per-pin interrupt support: edge (rising/falling) or level (active-high/active-low), sticky W1C status, enable mask
+- Parameterized `NumGpio` (default 32)
+- Uses struct-based Wishbone interface (`wb_m2s_t`/`wb_s2m_t` from `wb_pkg`)
+- Fixed `csr.core` to declare `wb_pkg` dependency (was missing since `wb2simple` was updated to use struct ports)
+
+**Files created:**
+- `hw/ip/gpio/rdl/gpio_csr.rdl` — SystemRDL register definitions
+- `hw/ip/gpio/rdl/Makefile` — PeakRDL-sv generation
+- `hw/ip/gpio/rtl/gpio_csr_reg_pkg.sv` — Generated CSR package
+- `hw/ip/gpio/rtl/gpio_csr_reg_top.sv` — Generated CSR block
+- `hw/ip/gpio/rtl/gpio_bit_ctrl.sv` — Per-bit SET/CLR/TOGGLE decoder and output register
+- `hw/ip/gpio/rtl/gpio.sv` — Top-level GPIO peripheral
+- `hw/ip/gpio/gpio.core` — FuseSoC core file
+- `hw/ip/gpio/lint/verilator.vlt` — Lint waivers for generated CSR code
+- `hw/ip/gpio/dv/gpio_tb.sv` — Testbench (19 checks)
+
+**Files modified:**
+- `hw/ip/csr/csr.core` — Added `mono:ip:wb_pkg` dependency (required by `wb2simple.sv`)
+- `docs/plans/ibex_soc_tasks.md` — Added task status, infrastructure entry, work log
+
+**Issues found and resolved:**
+1. **Address routing bug**: `is_perbit_region = reg_addr[8]` missed TOGGLE bank (0x200+) since bit 8 is 0 for those addresses. Fixed to `|reg_addr[9:8]`.
+2. **Verilator UNSIGNED warning**: `gpio_idx < NumGpio[4:0]` is constant-true when NumGpio=32. Added compile-time check.
+3. **Verilator UNUSEDSIGNAL**: Narrowed `perbit_addr_i` port to `[9:2]` instead of full bus width.
+
+**Lint status:** PASS (`mono:ip:gpio`)
+**Sim status:** PASS (19/19 tests — direct OUT, SET/CLR/TOGGLE, input sync, OE, edge/level IRQ, W1C)
+
+---
+
+### 2026-01-30: CDC FIFOs and Cocotb Testbench for core.sv
+
+**Work completed:**
+- Added CDC async FIFOs (`prim_fifo_async`) between FT601 PHY (usb_clk) and USB subsystem (sys_clk) in `core.sv`
+- RX path: FT601 → prim_fifo_async (usb_clk→sys_clk) → USB subsystem
+- TX path: USB subsystem → prim_fifo_async (sys_clk→usb_clk) → FT601
+- Both FIFOs: Width=32, Depth=4, separate reset per clock domain
+- Created Cocotb testbench for end-to-end USB-to-CPU path testing via FT601 PHY
+- SV wrapper (`core_tb.sv`) handles tristate bus emulation for FT601 bidirectional data/BE
+- Python tests use existing `FT601Driver` BFM from `mono.cocotb.ft601`
+- Three test cases: boot heartbeat, USB RX path, USB TX path
+
+**Files created:**
+- `hw/projects/squirrel/ibex_soc/dv/tb/core_tb.sv` — SV wrapper with tristate bus emulation
+- `hw/projects/squirrel/ibex_soc/dv/test_core.py` — Cocotb test module with CoreTestbench class
+- `hw/projects/squirrel/ibex_soc/dv/Makefile` — Standalone Cocotb/Verilator Makefile
+
+**Files modified:**
+- `hw/projects/squirrel/ibex_soc/rtl/core.sv` — Added two `prim_fifo_async` CDC FIFOs, removed CDC TODO comments
+- `hw/projects/squirrel/ibex_soc/project.core` — Added `lowrisc:prim:fifo` dependency
+- `hw/projects/squirrel/ibex_soc/lint/verilator.vlt` — Added waivers for CDC FIFO unconnected diagnostic outputs

@@ -7,8 +7,14 @@ filesets:
     depend:
       - mono:ip:mmcm
       - mono:ip:ibex_soc
-      # - mono:ip:ft601  # Commented out until USB bridge path is implemented
+      - mono:ip:ft601
+      - mono:ip:usb_core
+      - mono:ip:usb_uart
+      - mono:ip:wb_pkg
+      - lowrisc:prim:fifo
     files:
+      - rtl/usb_subsystem.sv
+      - rtl/core.sv
       - rtl/squirrel_ibex_top.sv
     file_type: systemVerilogSource
 
@@ -85,6 +91,7 @@ targets:
         mode: lint-only
         verilator_options:
           - -Wall
+          - -Wno-MODMISSING
 
   sim:
     default_tool: verilator

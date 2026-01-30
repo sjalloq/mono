@@ -1,0 +1,5 @@
+`verilator_config
+
+// Generated CSR code has unused signals and empty pin connections
+lint_off -rule UNUSEDSIGNAL -file "*/gpio_csr_reg_top.sv"
+lint_off -rule PINCONNECTEMPTY -file "*/gpio_csr_reg_top.sv"

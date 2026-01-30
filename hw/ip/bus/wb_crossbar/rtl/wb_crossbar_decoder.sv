@@ -9,37 +9,36 @@
 
 module wb_crossbar_decoder #(
   parameter int unsigned NumSlaves  = 2,
-  parameter int unsigned AddrWidth  = 32,
-  parameter int unsigned DataWidth  = 32,
-  parameter logic [NumSlaves-1:0][AddrWidth-1:0] AddrBase = '0,
-  parameter logic [NumSlaves-1:0][AddrWidth-1:0] AddrMask = '0,
   // Slave access mask: SlaveAccess[s] = 1 means this master can access slave s
-  parameter logic [NumSlaves-1:0] SlaveAccess = '1,
-  localparam int unsigned SelWidth  = DataWidth / 8
+  parameter logic [NumSlaves-1:0] SlaveAccess = '1
 ) (
   input  logic                                   clk_i,
   input  logic                                   rst_ni,
 
-  // Master interface
+  // Address map configuration
+  input  logic [NumSlaves-1:0][31:0]             cfg_addr_base_i,
+  input  logic [NumSlaves-1:0][31:0]             cfg_addr_mask_i,
+
+  // Master interface (individual signals — unpacked by crossbar)
   input  logic                                   m_cyc_i,
   input  logic                                   m_stb_i,
   input  logic                                   m_we_i,
-  input  logic [AddrWidth-1:0]                   m_adr_i,
-  input  logic [SelWidth-1:0]                    m_sel_i,
-  input  logic [DataWidth-1:0]                   m_dat_i,
+  input  logic [31:0]                            m_adr_i,
+  input  logic [3:0]                             m_sel_i,
+  input  logic [31:0]                            m_dat_i,
   output logic                                   m_ack_o,
   output logic                                   m_err_o,
   output logic                                   m_stall_o,
-  output logic [DataWidth-1:0]                   m_dat_o,
+  output logic [31:0]                            m_dat_o,
 
   // To arbiters
   output logic [NumSlaves-1:0]                   req_o,
   output logic                                   cyc_o,
   output logic                                   stb_o,
   output logic                                   we_o,
-  output logic [AddrWidth-1:0]                   adr_o,
-  output logic [SelWidth-1:0]                    sel_o,
-  output logic [DataWidth-1:0]                   wdat_o,
+  output logic [31:0]                            adr_o,
+  output logic [3:0]                             sel_o,
+  output logic [31:0]                            wdat_o,
 
   // From arbiters
   input  logic [NumSlaves-1:0]                   stall_i,
@@ -47,7 +46,7 @@ module wb_crossbar_decoder #(
   // From slaves
   input  logic [NumSlaves-1:0]                   ack_i,
   input  logic [NumSlaves-1:0]                   err_i,
-  input  logic [NumSlaves-1:0][DataWidth-1:0]    rdat_i
+  input  logic [NumSlaves-1:0][31:0]             rdat_i
 );
 
   // ===========================================================================
@@ -75,7 +74,7 @@ module wb_crossbar_decoder #(
   // Decode address and mask with slave access permissions
   for (genvar s = 0; s < NumSlaves; s++) begin : gen_decode
     assign slave_sel[s] = SlaveAccess[s] &&
-                          ((m_adr_i & AddrMask[s]) == (AddrBase[s] & AddrMask[s]));
+                          ((m_adr_i & cfg_addr_mask_i[s]) == (cfg_addr_base_i[s] & cfg_addr_mask_i[s]));
   end
 
   // ===========================================================================
@@ -115,7 +114,7 @@ module wb_crossbar_decoder #(
     for (int s = 0; s < NumSlaves; s++) begin
       m_ack_o = m_ack_o | (pending_slave_q[s] & ack_i[s]);
       m_err_o = m_err_o | (pending_slave_q[s] & err_i[s]);
-      m_dat_o = m_dat_o | ({DataWidth{pending_slave_q[s]}} & rdat_i[s]);
+      m_dat_o = m_dat_o | ({32{pending_slave_q[s]}} & rdat_i[s]);
     end
 
     // Default slave: ERR response for unmapped addresses in data phase

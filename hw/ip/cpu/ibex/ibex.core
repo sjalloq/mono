@@ -5,6 +5,7 @@ description: Ibex RISC-V core with Wishbone pipelined interface
 filesets:
   rtl:
     depend:
+      - mono:ip:wb_pkg
       - lowrisc:ibex:ibex_top
     files:
       - rtl/ibex_obi2wb.sv
