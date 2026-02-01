@@ -94,6 +94,7 @@ module usb_uart
     logic             timeout_flush_en;
     logic             thresh_flush_en;
     logic             sw_tx_flush;
+    logic             sw_tx_flush_ack;
     logic             sw_rx_flush;
     logic             sw_tx_clear;
     logic [31:0]      flush_timeout;
@@ -170,6 +171,19 @@ module usb_uart
     assign hw2reg.rx_data.d = rx_rd_data;
     assign hw2reg.rx_len.d  = rx_len;
 
+    // Clean flush flag as soon as flush is acknowledged.
+    assign hw2reg.ctrl.tx_flush.d = 1'b0;
+    assign hw2reg.ctrl.tx_flush.de = sw_tx_flush_ack;
+
+    // Single cycle pulse
+    assign hw2reg.ctrl.rx_flush.d = 1'b0;
+    assign hw2reg.ctrl.rx_flush.de = sw_rx_flush;
+    
+    // Single cycle pulse
+    assign hw2reg.ctrl.tx_clear.d = 1'b0;
+    assign hw2reg.ctrl.tx_clear.de = sw_tx_clear;
+
+
     // =========================================================================
     // TX FIFO
     // =========================================================================
@@ -197,6 +211,7 @@ module usb_uart
         .thresh_flush_en_i  (thresh_flush_en),
         .flush_timeout_i    (flush_timeout),
         .flush_thresh_i     (flush_thresh),
+        .sw_flush_ack_o     (sw_tx_flush_ack),
         .empty_o            (tx_empty),
         .full_o             (tx_full),
         .level_o            (tx_level)

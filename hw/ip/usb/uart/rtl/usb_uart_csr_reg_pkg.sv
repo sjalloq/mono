@@ -236,9 +236,10 @@ package usb_uart_csr_reg_pkg;
 
   // HW -> Register
   typedef struct packed {
-    usb_uart_csr_hw2reg_rx_data_t rx_data; // 89:58
-    usb_uart_csr_hw2reg_rx_len_t rx_len; // 57:26
-    usb_uart_csr_hw2reg_status_t status; // 25:8
+    usb_uart_csr_hw2reg_rx_data_t rx_data; // 95:64
+    usb_uart_csr_hw2reg_rx_len_t rx_len; // 63:32
+    usb_uart_csr_hw2reg_status_t status; // 31:14
+    usb_uart_csr_hw2reg_ctrl_t ctrl; // 13:8
     usb_uart_csr_hw2reg_irq_status_t irq_status; // 7:0
   } usb_uart_csr_hw2reg_t;
 

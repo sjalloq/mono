@@ -244,8 +244,8 @@ class USBDepacketizer(LiteXModule):
                 cnt.eq(cnt + 1)
             )
 
-        # length is in bytes, convert to 32-bit words
-        self.comb += last.eq(cnt == source.length[2:] - 1)
+        # length is in bytes, convert to 32-bit words (round up)
+        self.comb += last.eq(cnt == (source.length - 1)[2:])
 
 
 # =============================================================================

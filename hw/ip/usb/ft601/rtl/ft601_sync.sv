@@ -11,23 +11,23 @@
 // at the toplevel. Instead it provides data_o, data_i, and data_oe
 // signals for external tristate control.
 //
-// RX Timing:
+// RX Timing (3 data words):
 //
-//   clk     ─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─
-//            └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘
+//   clk     ─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─
+//            └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘
 //
-//   rxf_n   ─────┐                       ┌─────
-//                └───────────────────────┘
+//   rxf_n   ─────┐                               ┌───────
+//                └───────────────────────────────┘
 //
-//   oe_n    ─────────┐               ┌─────────
-//                    └───────────────┘
+//   oe_n    ─────────────┐                           ┌───
+//                        └───────────────────────────┘
 //
-//   rd_n    ─────────────┐       ┌─────────────
-//                        └───────┘
+//   rd_n    ─────────────────┐                       ┌───
+//                            └───────────────────────┘
 //
-//   data    ─────────────────X D0 X D1 X D2 X──
+//   data    ─────────────────────X D0 X D1 X D2 X────────
 //
-//   state    IDLE W1  W2  W3  ACTIVE      CD1 CD2
+//   state    IDLE W1  W2  W3  ACT  ACT  ACT  CD1 CD2
 //
 // TX Timing:
 //
@@ -118,6 +118,7 @@ module ft601_sync #(
 
   // TX data path
   logic [DW-1:0] tx_data_d, tx_data_q;
+  logic          tx_ready_d, tx_ready_q;
 
   // State decode signals
   logic in_rx_oe_states;
@@ -191,7 +192,8 @@ module ft601_sync #(
     rx_valid_d = rxf && (state_q == StRxActive);
 
     // TX data path
-    tx_data_d = tx_latch ? tx_data_i : tx_data_q;
+    tx_data_d  = tx_latch ? tx_data_i : tx_data_q;
+    tx_ready_d = tx_latch;
   end
 
   // ===========================================================================
@@ -208,6 +210,7 @@ module ft601_sync #(
       rx_data_q  <= '0;
       rx_valid_q <= '0;
       tx_data_q  <= '0;
+      tx_ready_q <= '0;
     end else begin
       state_q    <= state_d;
       rd_n_q     <= rd_n_d;
@@ -217,6 +220,7 @@ module ft601_sync #(
       rx_data_q  <= rx_data_d;
       rx_valid_q <= rx_valid_d;
       tx_data_q  <= tx_data_d;
+      tx_ready_q <= tx_ready_d;
     end
   end
 
@@ -239,6 +243,6 @@ module ft601_sync #(
   assign rx_data_o  = rx_data_q;
   assign rx_valid_o = rx_valid_q;
 
-  assign tx_ready_o = tx_latch;
+  assign tx_ready_o = tx_ready_q;
 
 endmodule

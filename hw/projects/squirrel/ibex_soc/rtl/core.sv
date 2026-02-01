@@ -32,6 +32,7 @@ module core
 
     // FT601 USB 3.0 FIFO interface (split signals from IOBUFs)
     input  logic        usb_clk_i,
+    input  logic        usb_rst_ni,
     input  logic [31:0] usb_data_i,
     output logic [31:0] usb_data_o,
     output logic        usb_data_oe,
@@ -77,18 +78,6 @@ module core
     assign user_led[0] = led_counter[26];
     assign user_led[1] = user_sw[0];
 
-    // =========================================================================
-    // USB Domain Reset Synchronizer
-    // =========================================================================
-
-    logic usb_rst_n;
-    logic [3:0] usb_rst_sync;
-
-    always_ff @(posedge usb_clk_i) begin
-        usb_rst_sync <= {usb_rst_sync[2:0], 1'b1};
-    end
-
-    assign usb_rst_n = usb_rst_sync[3];
 
     // =========================================================================
     // FT601 PHY (USB clock domain)
@@ -104,7 +93,7 @@ module core
         .DW (32)
     ) u_ft601 (
         .clk_i      (usb_clk_i),
-        .rst_ni     (usb_rst_n),
+        .rst_ni     (usb_rst_ni),
 
         // FT601 control signals
         .rxf_ni     (usb_rxf_ni),
@@ -143,10 +132,10 @@ module core
 
     prim_fifo_async #(
         .Width (32),
-        .Depth (4)
+        .Depth (16)
     ) u_cdc_rx_fifo (
         .clk_wr_i  (usb_clk_i),
-        .rst_wr_ni (usb_rst_n),
+        .rst_wr_ni (usb_rst_ni),
         .wvalid_i  (ft601_rx_valid),
         .wready_o  (),  // FT601 RX has no backpressure
         .wdata_i   (ft601_rx_data),
@@ -167,7 +156,7 @@ module core
 
     prim_fifo_async #(
         .Width (32),
-        .Depth (4)
+        .Depth (16)
     ) u_cdc_tx_fifo (
         .clk_wr_i  (sys_clk),
         .rst_wr_ni (sys_rst_n),
@@ -177,7 +166,7 @@ module core
         .wdepth_o  (),
 
         .clk_rd_i  (usb_clk_i),
-        .rst_rd_ni (usb_rst_n),
+        .rst_rd_ni (usb_rst_ni),
         .rvalid_o  (ft601_tx_valid),
         .rready_i  (ft601_tx_ready),
         .rdata_o   (ft601_tx_data),

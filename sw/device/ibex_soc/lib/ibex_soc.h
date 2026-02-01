@@ -32,4 +32,11 @@ void timer_set_cmp(uint64_t cmp);
 void exception_handler(void);
 void timer_interrupt_handler(void);
 
+// USB UART functions
+void usb_uart_tx_word(uint32_t word);
+void usb_uart_tx_flush(void);
+uint32_t usb_uart_rx_len(void);
+uint32_t usb_uart_rx_word(void);
+uint32_t usb_uart_status(void);
+
 #endif // IBEX_SOC_H

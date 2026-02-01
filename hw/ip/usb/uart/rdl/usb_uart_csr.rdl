@@ -136,22 +136,19 @@ addrmap usb_uart_csr {
         field {
             desc = "Software TX flush (write-1-to-trigger)";
             sw = rw;
-            hw = r;
-            singlepulse;
+            hw = rw;
         } tx_flush[5:5] = 0;
 
         field {
             desc = "Software RX flush/clear (write-1-to-trigger)";
             sw = rw;
-            hw = r;
-            singlepulse;
+            hw = rw;
         } rx_flush[6:6] = 0;
 
         field {
             desc = "TX FIFO clear/reset (write-1-to-trigger)";
             sw = rw;
-            hw = r;
-            singlepulse;
+            hw = rw;
         } tx_clear[7:7] = 0;
 
     };

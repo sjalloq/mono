@@ -70,3 +70,29 @@ void timer_interrupt_handler(void) {
     puts("TIMER IRQ!");
     sim_halt();
 }
+
+// USB UART: write a 32-bit word to TX FIFO
+void usb_uart_tx_word(uint32_t word) {
+    REG_WRITE(USB_UART_BASE + USB_UART_TX_DATA, word);
+}
+
+// USB UART: trigger a software flush of the TX FIFO
+void usb_uart_tx_flush(void) {
+    uint32_t ctrl = REG_READ(USB_UART_BASE + USB_UART_CTRL);
+    REG_WRITE(USB_UART_BASE + USB_UART_CTRL, ctrl | USB_UART_CTRL_TX_FLUSH);
+}
+
+// USB UART: read byte count of current RX packet (peek, no pop)
+uint32_t usb_uart_rx_len(void) {
+    return REG_READ(USB_UART_BASE + USB_UART_RX_LEN);
+}
+
+// USB UART: read a 32-bit word from RX FIFO (pops)
+uint32_t usb_uart_rx_word(void) {
+    return REG_READ(USB_UART_BASE + USB_UART_RX_DATA);
+}
+
+// USB UART: read status register
+uint32_t usb_uart_status(void) {
+    return REG_READ(USB_UART_BASE + USB_UART_STATUS);
+}

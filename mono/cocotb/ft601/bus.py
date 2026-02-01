@@ -31,8 +31,9 @@ class FT601Bus(Bus):
 
     _signals = [
         "clk",      # 100MHz clock from FT601
-        "data",     # 32-bit bidirectional data bus
-        "be",       # 4-bit byte enables
+        "data",     # 32-bit data bus: BFM -> DUT (FT601 drives during FPGA reads)
+        "data_o",   # 32-bit data bus: DUT -> BFM (FPGA drives during writes)
+        "be",       # 4-bit byte enables (from DUT during writes)
         "rxf_n",    # RX FIFO not empty (active low) - FT601 has data for FPGA
         "txe_n",    # TX FIFO not full (active low) - FT601 can accept data
         "rd_n",     # Read strobe (active low) - FPGA reading from FT601

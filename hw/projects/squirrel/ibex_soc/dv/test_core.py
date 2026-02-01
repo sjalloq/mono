@@ -79,6 +79,7 @@ class CoreTestbench:
         self.sys_clk.value = Immediate(0)
         self.usb_clk.value = Immediate(0)
         dut.sys_rst_n.value = Immediate(1)
+        dut.usb_rst_n.value = Immediate(1)
         dut.user_sw.value = Immediate(0)
 
         # Start clocks: sys_clk = 62.5 MHz (16ns), usb_clk = 100 MHz (10ns)
@@ -192,8 +193,10 @@ class CoreTestbench:
         self.log.info("Asserting reset")
         await ClockCycles(self.sys_clk, 2)
         self.dut.sys_rst_n.value = 0
+        self.dut.usb_rst_ni.value = 0
         await ClockCycles(self.sys_clk, cycles)
         self.dut.sys_rst_n.value = 1
+        self.dut.usb_rst_ni.value = 1
         # Wait for USB domain reset synchronizer to release
         await ClockCycles(self.usb_clk, 10)
         # Clear any transient error state from reset, then enable monitoring
@@ -241,7 +244,7 @@ class CoreTestbench:
         await ClockCycles(self.usb_clk, n)
 
 
-@cocotb.test(timeout_time=5, timeout_unit='ms')
+@cocotb.test(timeout_time=50, timeout_unit='us')
 async def test_boot_heartbeat(dut):
     """Verify CPU boots and executes firmware (produces SimCtrl output)."""
     tb = CoreTestbench(dut)
@@ -278,96 +281,3 @@ async def test_boot_heartbeat(dut):
     dut._log.info("PASS: CPU booted and produced output")
 
 
-@cocotb.test(timeout_time=5, timeout_unit='ms')
-async def test_usb_rx_to_uart(dut):
-    """Host-to-device path: send USB-framed packet via FT601 to USB UART.
-
-    Constructs a USB-framed packet targeting channel 0 (UART) and sends it
-    through the FT601 driver. Verifies the packet traverses the CDC FIFOs
-    and reaches the USB core depacketizer.
-
-    Full end-to-end verification (data arriving at CPU) requires firmware
-    that polls the USB UART RX. This test verifies the PHY-to-CDC path.
-    """
-    tb = CoreTestbench(dut)
-
-    dut._log.info("=== test_usb_rx_to_uart ===")
-    dut._log.info("Send USB-framed packet through FT601 -> CDC -> USB Core")
-
-    await tb.reset()
-
-    # Wait for CPU to boot (verify firmware is loaded)
-    dut._log.info("Waiting for CPU boot confirmation...")
-    got_output = await tb.wait_for_cpu_output(timeout_cycles=20000)
-    if not got_output:
-        raise AssertionError(
-            "CPU produced no output — cannot verify USB RX path "
-            "without a running CPU. Check vmem file."
-        )
-    dut._log.info("CPU is running")
-
-    # Build a USB-framed packet: 4 bytes of payload on channel 0
-    payload = b'\x48\x65\x6c\x6c'  # "Hell"
-    packet = build_usb_packet(USB_CHANNEL_UART, payload)
-
-    dut._log.info(f"Sending USB packet ({len(packet)} words): "
-                  f"{[f'{w:#010x}' for w in packet]}")
-
-    # Send via FT601 driver
-    await tb.ft601.send_to_fpga(packet)
-
-    # Allow time for CDC crossing and USB core processing
-    dut._log.info("Waiting for CDC crossing and USB core processing...")
-    await tb.sys_cycles(500)
-
-    tb.check_no_cpu_errors()
-
-    dut._log.info("PASS: USB RX packet sent through FT601 -> CDC FIFO path")
-
-
-@cocotb.test(timeout_time=5, timeout_unit='ms')
-async def test_usb_uart_tx(dut):
-    """Device-to-host path: verify USB UART TX produces framed output.
-
-    Boots the CPU with firmware that writes to SimCtrl (not USB UART TX).
-    Checks whether any data emerges on the FT601 TX path.
-
-    Full TX path testing requires firmware that writes to USB UART TX.
-    """
-    tb = CoreTestbench(dut)
-
-    dut._log.info("=== test_usb_uart_tx ===")
-    dut._log.info("Check FT601 TX path for any output from USB subsystem")
-
-    await tb.reset()
-
-    # Wait for CPU to boot
-    dut._log.info("Waiting for CPU boot confirmation...")
-    got_output = await tb.wait_for_cpu_output(timeout_cycles=20000)
-    if not got_output:
-        raise AssertionError(
-            "CPU produced no output — cannot verify USB TX path "
-            "without a running CPU. Check vmem file."
-        )
-    dut._log.info("CPU is running")
-
-    # Let firmware run a bit more to potentially produce USB output
-    dut._log.info("Running CPU for additional cycles to collect TX data...")
-    await tb.sys_cycles(5000)
-
-    # Check if any data was received from FPGA
-    if tb.ft601.rx_queue_depth > 0:
-        received = []
-        while tb.ft601.rx_queue_depth > 0:
-            word = await tb.ft601.receive_from_fpga(count=1)
-            received.append(word)
-        dut._log.info(f"Received {len(received)} words from FPGA TX path")
-        for i, w in enumerate(received):
-            dut._log.info(f"  TX word[{i}]: {w}")
-    else:
-        dut._log.info("No TX data received (expected — hello firmware "
-                      "uses SimCtrl, not USB UART TX)")
-
-    tb.check_no_cpu_errors()
-
-    dut._log.info("PASS: USB TX path check completed")

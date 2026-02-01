@@ -45,7 +45,9 @@ module squirrel_ibex_top #(
     logic rst_por;
     logic rst_req_n;
     logic [3:0] rst_sync;
+    logic [3:0] usb_rst_sync;
     logic mmcm_locked;
+    logic usb_rst_n;
 
     // =========================================================================
     // Clock and Reset Generation
@@ -98,6 +100,17 @@ module squirrel_ibex_top #(
 
     assign rst_n = rst_sync[3];
 
+    // USB domain reset synchronizer
+    // REVISIT: BUFG for USB clock
+    always_ff @(posedge usb_fifo_clk or negedge rst_req_n) begin
+        if (!rst_req_n)
+            usb_rst_sync <= '0;
+        else
+            usb_rst_sync <= {usb_rst_sync[2:0], 1'b1};
+    end
+
+    assign usb_rst_n = usb_rst_sync[3];    
+
     // =========================================================================
     // FT601 USB Tristate I/O (Xilinx IOBUF primitives)
     // =========================================================================
@@ -144,6 +157,7 @@ module squirrel_ibex_top #(
 
         // FT601 split signals (from/to IOBUFs)
         .usb_clk_i    (usb_fifo_clk),
+        .usb_rst_ni   (usb_rst_n),
         .usb_data_i   (usb_data_i),
         .usb_data_o   (usb_data_o),
         .usb_data_oe  (usb_data_oe),

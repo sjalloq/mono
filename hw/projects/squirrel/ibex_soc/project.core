@@ -113,3 +113,7 @@ targets:
     flow: generic
     flow_options:
       tool: flist
+      file_types:
+        - systemVerilogSource
+        - verilogSource
+        - vlt

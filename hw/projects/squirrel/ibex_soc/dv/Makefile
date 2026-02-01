@@ -8,7 +8,7 @@ REPO_ROOT := $(abspath $(MKDIR)/../../../../..)
 # Design under test
 TOPLEVEL_LANG = verilog
 TOPLEVEL = core_tb
-MODULE = test_core
+COCOTB_TEST_MODULES ?= test_core,test_usb_uart
 FILELIST = $(MKDIR)/filelist.f
 
 # Firmware test to build and load (directory under sw/device/squirrel/ibex_soc/)
@@ -32,7 +32,8 @@ EXTRA_ARGS += -GItcmInitFile=\"$(TEST).vmem\"
 EXTRA_ARGS += -Wno-fatal
 
 # Additional dependencies for the included Cocotb Makefiles
-CUSTOM_COMPILE_DEPS = filelist firmware
+CUSTOM_COMPILE_DEPS = filelist
+CUSTOM_SIM_DEPS = firmware
 
 include $(shell cocotb-config --makefiles)/Makefile.sim
 
@@ -59,5 +60,16 @@ check-vmem:
 	    exit 1; \
 	fi
 
+# Convenience targets
+.PHONY: run_usb run_all
+
+run_usb:
+	$(MAKE) TEST=usb_echo COCOTB_TEST_MODULES=test_usb_uart
+
+run_all:
+	$(MAKE) TEST=hello COCOTB_TEST_MODULES=test_core T=test_boot_heartbeat
+	$(MAKE) TEST=usb_echo COCOTB_TEST_MODULES=test_usb_uart
+
 clean::
 	rm -f $(FILELIST) $(TEST).vmem
+

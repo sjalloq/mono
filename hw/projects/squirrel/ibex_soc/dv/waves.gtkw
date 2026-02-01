@@ -1,0 +1,178 @@
+[*]
+[*] GTKWave Analyzer v3.3.125 (w)1999-2025 BSI
+[*] Sun Feb  1 19:52:19 2026
+[*]
+[dumpfile] "/home/sjalloq/Work/mono/hw/projects/squirrel/ibex_soc/dv/dump.fst"
+[dumpfile_mtime] "Sun Feb  1 19:50:56 2026"
+[dumpfile_size] 233654
+[savefile] "/home/sjalloq/Work/mono/hw/projects/squirrel/ibex_soc/dv/waves.gtkw"
+[timestart] 0
+[size] 2639 1001
+[pos] -1 -1
+*-21.631321 7935500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] core_tb.
+[treeopen] core_tb.u_dut.
+[treeopen] core_tb.u_dut.u_soc.
+[treeopen] core_tb.u_dut.u_usb_subsystem.
+[treeopen] core_tb.u_dut.u_usb_subsystem.u_usb_uart.
+[sst_width] 290
+[signals_width] 480
+[sst_expanded] 1
+[sst_vpaned_height] 422
+@28
+core_tb.u_dut.u_soc.u_cpu.clk_i
+core_tb.sys_rst_n
+core_tb.u_dut.usb_clk_i
+core_tb.u_dut.usb_rst_ni
+@800200
+-SIM_CTRL
+@28
+core_tb.u_dut.u_soc.u_sim_ctrl.sim_halt_o
+core_tb.u_dut.u_soc.u_sim_ctrl.char_valid_o
+@820
+core_tb.u_dut.u_soc.u_sim_ctrl.char_data_o[7:0]
+@1000200
+-SIM_CTRL
+@800200
+-USB PHY
+-CDC TX FIFO
+@28
+core_tb.u_dut.u_cdc_tx_fifo.wvalid_i
+core_tb.u_dut.u_cdc_tx_fifo.wready_o
+@820
+core_tb.u_dut.u_cdc_tx_fifo.wdata_i[31:0]
+@28
+core_tb.u_dut.u_cdc_tx_fifo.rvalid_o
+core_tb.u_dut.u_cdc_tx_fifo.rready_i
+@22
+core_tb.u_dut.u_cdc_tx_fifo.rdata_o[31:0]
+@820
+core_tb.u_dut.u_cdc_tx_fifo.rdata_o[31:0]
+@28
+core_tb.u_dut.u_cdc_tx_fifo.clk_rd_i
+core_tb.u_dut.u_cdc_tx_fifo.clk_wr_i
+core_tb.u_dut.u_cdc_tx_fifo.rst_rd_ni
+@29
+core_tb.u_dut.u_cdc_tx_fifo.rst_wr_ni
+@1000200
+-CDC TX FIFO
+@c00200
+-CDC RX FIFO
+@28
+core_tb.u_dut.u_cdc_rx_fifo.wvalid_i
+core_tb.u_dut.u_cdc_rx_fifo.wready_o
+@22
+core_tb.u_dut.u_cdc_rx_fifo.wdata_i[31:0]
+core_tb.u_dut.u_cdc_rx_fifo.rdata_o[31:0]
+@820
+core_tb.u_dut.u_cdc_rx_fifo.rdata_o[31:0]
+@28
+core_tb.u_dut.u_cdc_rx_fifo.rvalid_o
+core_tb.u_dut.u_cdc_rx_fifo.rready_i
+@1401200
+-CDC RX FIFO
+@800200
+-FT601
+@28
+core_tb.u_dut.u_ft601.rst_ni
+core_tb.u_dut.u_ft601.rxf_ni
+core_tb.u_dut.u_ft601.txe_ni
+core_tb.u_dut.u_ft601.oe_no
+core_tb.u_dut.u_ft601.rd_no
+core_tb.u_dut.u_ft601.wr_no
+core_tb.u_dut.u_ft601.siwu_no
+core_tb.u_dut.u_ft601.rst_no
+@22
+core_tb.u_dut.u_ft601.data_o[31:0]
+core_tb.u_dut.u_ft601.data_i[31:0]
+@820
+core_tb.u_dut.u_ft601.data_i[31:0]
+@28
+core_tb.u_dut.u_ft601.data_oe
+core_tb.u_dut.u_ft601.tx_valid_i
+@22
+core_tb.u_dut.u_ft601.tx_data_i[31:0]
+@28
+core_tb.u_dut.u_ft601.tx_latch
+@22
+core_tb.u_dut.u_ft601.tx_data_q[31:0]
+@100000028
+core_tb.u_dut.u_ft601.state_q[3:0]
+@28
+core_tb.u_dut.u_ft601.rst_ni
+@1000200
+-FT601
+@28
+core_tb.u_dut.u_usb_subsystem.phy_tx_valid_o
+core_tb.u_dut.u_usb_subsystem.phy_tx_ready_i
+@22
+core_tb.u_dut.u_usb_subsystem.phy_tx_data_o[31:0]
+@1000200
+-USB PHY
+@800200
+-USB TX FIFO
+@28
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_tx_fifo.rst_ni
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_tx_fifo.clk_i
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_tx_fifo.enable_i
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_tx_fifo.tx_valid_o
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_tx_fifo.tx_ready_i
+@22
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_tx_fifo.tx_dst_o[7:0]
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_tx_fifo.tx_data_o[31:0]
+@28
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_tx_fifo.tx_last_o
+@1000200
+-USB TX FIFO
+@28
+core_tb.u_dut.u_usb_subsystem.phy_tx_ready_i
+@800200
+-USB CORE
+-CH0 TX
+@28
+core_tb.u_dut.u_usb_subsystem.ch0_tx_valid
+core_tb.u_dut.u_usb_subsystem.ch0_tx_ready
+@24
+core_tb.u_dut.u_usb_subsystem.ch0_tx_length[31:0]
+@22
+core_tb.u_dut.u_usb_subsystem.ch0_tx_dst[7:0]
+@820
+core_tb.u_dut.u_usb_subsystem.ch0_tx_data[31:0]
+@22
+core_tb.u_dut.u_usb_subsystem.ch0_tx_error[3:0]
+@1000200
+-CH0 TX
+@c00200
+-CH0 RX
+@28
+core_tb.u_dut.u_usb_subsystem.ch0_rx_valid
+core_tb.u_dut.u_usb_subsystem.ch0_rx_ready
+@22
+core_tb.u_dut.u_usb_subsystem.ch0_rx_length[31:0]
+core_tb.u_dut.u_usb_subsystem.ch0_rx_dst[7:0]
+@820
+core_tb.u_dut.u_usb_subsystem.ch0_rx_data[31:0]
+@22
+core_tb.u_dut.u_usb_subsystem.ch0_rx_error[3:0]
+@28
+core_tb.u_dut.u_usb_subsystem.ch0_rx_first
+core_tb.u_dut.u_usb_subsystem.ch0_rx_last
+@1401200
+-CH0 RX
+@1000200
+-USB CORE
+@800200
+-USB CSR IF
+@28
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_csr.reg_re
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_csr.reg_we
+@22
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_csr.reg_addr[5:0]
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_csr.reg_wdata[31:0]
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_csr.reg_rdata[31:0]
+@820
+core_tb.u_dut.u_usb_subsystem.u_usb_uart.u_csr.reg_rdata[31:0]
+@1000200
+-USB CSR IF
+[pattern_trace] 1
+[pattern_trace] 0

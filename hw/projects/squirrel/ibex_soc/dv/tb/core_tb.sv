@@ -21,9 +21,13 @@ module core_tb #(
     input  logic [1:0]  user_sw,
 
     // FT601 USB interface (flat signals for cocotb FT601Driver)
+    // Data bus is split into input/output for Verilator 2-state compatibility.
+    // V e r i l a t o r cannot resolve tristate (z becomes 0), so inout doesn't work.
     input  logic        usb_clk,
-    inout  wire  [31:0] usb_data,
-    inout  wire  [3:0]  usb_be,
+    input  logic        usb_rst_ni,
+    input  wire  [31:0] usb_data,       // BFM -> DUT (FT601 drives during FPGA reads)
+    output logic [31:0] usb_data_o,     // DUT -> BFM (FPGA drives during writes)
+    output logic [3:0]  usb_be,         // DUT -> BFM (byte enables during writes)
     input  logic        usb_rxf_n,
     input  logic        usb_txe_n,
     output logic        usb_rd_n,
@@ -59,7 +63,6 @@ module core_tb #(
     // We emulate the shared bidirectional bus here.
 
     logic [31:0] usb_data_i;
-    logic [31:0] usb_data_o;
     logic        usb_data_oe;
     logic [3:0]  usb_be_o;
     logic        usb_be_oe;
@@ -73,11 +76,11 @@ module core_tb #(
     assign crash_dump_exception_pc  = crash_dump.exception_pc;
     assign crash_dump_exception_addr = crash_dump.exception_addr;
 
-    // When DUT drives (oe active), bus = DUT output; otherwise DUT reads bus
-    assign usb_data   = usb_data_oe ? usb_data_o : 32'bz;
+    // V e r i l a t o r 2-state data bus routing (no tristate)
+    // BFM drives usb_data input for FT601-to-FPGA (RX) transfers.
+    // DUT output exposed on usb_data_o for FPGA-to-FT601 (TX) transfers.
     assign usb_data_i = usb_data;
-
-    assign usb_be   = usb_be_oe ? usb_be_o : 4'bz;
+    assign usb_be     = usb_be_o;
 
     // =========================================================================
     // DUT instantiation
@@ -95,8 +98,9 @@ module core_tb #(
 
         // FT601 split signals
         .usb_clk_i    (usb_clk),
+        .usb_rst_ni   (usb_rst_ni),
         .usb_data_i   (usb_data_i),
-        .usb_data_o   (usb_data_o),
+        .usb_data_o   (usb_data_o),    // wired to TB output port
         .usb_data_oe  (usb_data_oe),
         .usb_be_o     (usb_be_o),
         .usb_be_oe    (usb_be_oe),
@@ -120,6 +124,10 @@ module core_tb #(
         .double_fault_seen_o    (double_fault_seen),
         .crash_dump_o           (crash_dump)
     );
+
+    // Unused signals (tristate enables not needed in Verilator 2-state sim)
+    logic unused_oe;
+    assign unused_oe = &{usb_data_oe, usb_be_oe};
 
     // =========================================================================
     // Waveform dump

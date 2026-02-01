@@ -42,6 +42,9 @@ module usb_uart_tx_fifo #(
     input  logic [31:0]      flush_timeout_i,    // Timeout value in cycles
     input  logic [7:0]       flush_thresh_i,     // Threshold level (words)
 
+    // Acks
+    output logic sw_flush_ack_o,
+
     // Status outputs
     output logic             empty_o,
     output logic             full_o,
@@ -148,6 +151,10 @@ module usb_uart_tx_fifo #(
     // Combined (only in IDLE state)
     assign any_flush_trigger = (state_q == IDLE) && !empty_o &&
                                (sw_flush_i || timeout_trigger || thresh_trigger || char_trigger);
+
+    // Trigger ack
+    assign sw_flush_ack_o = (state_q == IDLE) && !empty_o && sw_flush_i;
+
 
     // =========================================================================
     // Write Logic

@@ -78,58 +78,53 @@ class FT601Driver(BusDriver):
             data = [data]
 
         for word in data:
+            self.log.info(f"Putting {hex(word)} into queue")
             await self._tx_queue.put(word)
 
-    async def receive_from_fpga(self, count=1, timeout_cycles=1000):
-        """Receive data written by the FPGA.
+    async def receive_from_fpga(self):
+        """Receive a complete packet written by the FPGA.
 
-        Args:
-            count: Number of words to receive.
-            timeout_cycles: Maximum clock cycles to wait per word.
+        The RX handler accumulates all words from a single wr_n burst
+        and enqueues them as one packet.
 
         Returns:
-            List of received 32-bit words.
-
-        Raises:
-            TimeoutError: If data is not received within timeout.
+            List of (data, be) tuples for the packet.
         """
-        received = []
-        for _ in range(count):
-            word = await self._rx_queue.get()
-            received.append(word)
-
-        return received if count > 1 else received[0]
+        return await self._rx_queue.get()
 
     async def _tx_handler(self):
         """Handle TX path: FT601 sending data to FPGA.
 
         This coroutine monitors the queue and asserts rxf_n when data
-        is available, then drives data when the FPGA asserts oe_n and rd_n.
+        is available, then drives data onto the bus when the FPGA asserts
+        oe_n. The FT601 enables its output drivers on OE_N going LOW;
+        RD_N going LOW one cycle later is the read strobe indicating the
+        bus turnaround is complete and the FPGA will begin capturing data.
         """
         while True:
-            # Wait for data to be queued
+            # Wait for data to be queue
             data = await self._tx_queue.get()
 
             # Assert rxf_n (data available)
             self.bus.rxf_n.value = 0
+            await RisingEdge(self.clock)
 
             # Wait for FPGA to assert oe_n (request to read)
             while self.bus.oe_n.value == 1:
                 await RisingEdge(self.clock)
 
-            # Wait for FPGA to assert rd_n (start reading)
+            # Drive first data word immediately — the real FT601 enables its
+            # output drivers as soon as OE_N goes LOW.
+            self.bus.data.value = data
+            await RisingEdge(self.clock)
+
+            # Wait for FPGA to assert rd_n (bus turnaround complete)
             while self.bus.rd_n.value == 1:
                 await RisingEdge(self.clock)
 
-            # Drive data (1 cycle after rd_n per timing diagram)
-            await RisingEdge(self.clock)
-            self.bus.data.value = data
-
-            # Continue driving data from queue while rd_n is asserted
+            # Stream remaining data: advance each cycle while rd_n is LOW
             while self.bus.rd_n.value == 0:
-                await RisingEdge(self.clock)
 
-                # Check if more data in queue
                 if not self._tx_queue.empty():
                     data = self._tx_queue.get_nowait()
                     self.bus.data.value = data
@@ -138,6 +133,8 @@ class FT601Driver(BusDriver):
                     self.bus.rxf_n.value = 1
                     break
 
+                await RisingEdge(self.clock)
+
             # Deassert rxf_n when done
             self.bus.rxf_n.value = 1
 
@@ -145,19 +142,30 @@ class FT601Driver(BusDriver):
         """Handle RX path: FPGA sending data to FT601.
 
         This coroutine monitors wr_n and captures data written by the FPGA.
+        Words are accumulated for the duration of a single wr_n LOW burst
+        and enqueued as a complete packet when wr_n goes HIGH.
+
+        The real FT601 captures data on the rising edge where wr_n is already
+        LOW. Since wr_n and data_o are both registered (updated on the rising
+        edge), we sample on the falling edge where both have settled from the
+        previous rising edge.
         """
         while True:
-            await RisingEdge(self.clock)
+            await FallingEdge(self.clock)
 
-            # Check if FPGA is writing (wr_n asserted and we can accept)
+            # Wait for start of a write burst
             if self.bus.wr_n.value == 0 and self.bus.txe_n.value == 0:
-                # Sample data at read-only phase for stability
-                await ReadOnly()
-                data = int(self.bus.data.value)
-                be = int(self.bus.be.value)
+                packet = []
 
-                # Store received word with byte enables
-                await self._rx_queue.put((data, be))
+                # Accumulate words for the entire burst
+                while self.bus.wr_n.value == 0 and self.bus.txe_n.value == 0:
+                    data = int(self.bus.data_o.value)
+                    be = int(self.bus.be.value)
+                    packet.append((data, be))
+                    await FallingEdge(self.clock)
+
+                # Enqueue the complete packet
+                await self._rx_queue.put(packet)
 
     def set_tx_ready(self, ready=True):
         """Control whether FT601 can accept data from FPGA.
@@ -174,5 +182,5 @@ class FT601Driver(BusDriver):
 
     @property
     def rx_queue_depth(self):
-        """Number of words received from FPGA."""
+        """Number of packets received from FPGA."""
         return self._rx_queue.qsize()
