@@ -53,13 +53,14 @@ IDLE
     else TX_WAIT1 if ``txe_n=0`` and data available.
 
 RX_WAIT1
-    Assert ``oe_n=0`` to enable FT601 output drivers.
+    First wait cycle after ``rxf_n`` sampled LOW.
 
 RX_WAIT2
-    Assert ``rd_n=0`` to begin read. Output drivers settling.
+    Evaluate ``oe_n_d=0``. Registered ``oe_n`` goes LOW on next posedge (W2→W3).
 
 RX_WAIT3
-    First data word is being driven by FT601.
+    Evaluate ``rd_n_d=0``. Registered ``rd_n`` goes LOW on next posedge (W3→ACT).
+    FT601 starts driving data in response to ``oe_n`` going LOW.
 
 RX_ACTIVE
     Capture data on each clock. Continue while ``rxf_n=0``. Data is registered
@@ -81,26 +82,26 @@ TX_COOLDOWN1/2
     Complete write transaction, prepare for next operation.
 
 
-Timing Diagram (RX)
--------------------
+Timing Diagram (RX — 3 data words)
+-----------------------------------
 
 .. code-block:: text
 
-    CLK     ─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─
-             └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘
+    CLK     ─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌─
+             └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘
 
-    rxf_n   ─────┐                       ┌─────
-                 └───────────────────────┘
+    rxf_n   ─────┐                               ┌───────
+                 └───────────────────────────────┘
 
-    oe_n    ─────────┐               ┌─────────
-                     └───────────────┘
+    oe_n    ─────────────┐                           ┌───
+                         └───────────────────────────┘
 
-    rd_n    ─────────────┐       ┌─────────────
-                         └───────┘
+    rd_n    ─────────────────┐                       ┌───
+                             └───────────────────────┘
 
-    data    ─────────────────X D0 X D1 X D2 X──
+    data    ─────────────────────X D0 X D1 X D2 X────────
 
-    State    IDLE W1  W2  W3  ACTIVE      CD1 CD2
+    State    IDLE W1  W2  W3  ACT  ACT  ACT  CD1 CD2
 
 
 Clock Domain Crossing

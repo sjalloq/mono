@@ -8,6 +8,7 @@ Mono
 
    repository
    ibex_soc/index
+   serv_soc/index
    usb/index
    tools/index
 

@@ -85,14 +85,14 @@ Vector Table
 
 The vector table is placed at the start of ITCM:
 
-========  ====================  ================================
-Offset    Vector                Handler
-========  ====================  ================================
-0x00-0x1B Exception vectors     ``exception_handler()``
-0x1C      Timer interrupt       ``timer_interrupt_handler()``
-0x20-0x7F More exceptions       ``exception_handler()``
-0x80      Reset vector          ``reset_handler``
-========  ====================  ================================
+=========  ====================  ================================
+Offset     Vector                Handler
+=========  ====================  ================================
+0x00-0x1B  Exception vectors     ``exception_handler()``
+0x1C       Timer interrupt       ``timer_interrupt_handler()``
+0x20-0x7F  More exceptions       ``exception_handler()``
+0x80       Reset vector          ``reset_handler``
+=========  ====================  ================================
 
 ***
 HAL

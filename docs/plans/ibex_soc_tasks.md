@@ -746,3 +746,24 @@ Task 8 (SystemRDL) ─► Task 9 (Rust)
 - `hw/projects/squirrel/ibex_soc/rtl/core.sv` — Added two `prim_fifo_async` CDC FIFOs, removed CDC TODO comments
 - `hw/projects/squirrel/ibex_soc/project.core` — Added `lowrisc:prim:fifo` dependency
 - `hw/projects/squirrel/ibex_soc/lint/verilator.vlt` — Added waivers for CDC FIFO unconnected diagnostic outputs
+
+---
+
+### 2026-02-01: Fix FT601 BFM `_tx_handler` and Timing Diagrams
+
+**Work completed:**
+- Fixed `_tx_handler` in FT601 cocotb BFM: data is now driven as soon as `OE_N` goes LOW (matching real FT601 behaviour), instead of waiting for both `OE_N` and `RD_N` to be LOW
+- Fixed RX timing diagrams in both `ft601_sync.sv` comments and `ft601_phy.rst` docs: all FPGA output signals (`oe_n`, `rd_n`) were shown one cycle early and deasserted too early. Corrected to show registered output delays and proper cooldown timing
+- Updated state descriptions in `ft601_phy.rst` to accurately describe which cycle each signal transitions
+
+**Key timing corrections:**
+- `rxf_n` falls → `oe_n` falls 2 cycles later (registered from W2 eval)
+- `oe_n` falls → `rd_n` falls 1 cycle later (registered from W3 eval)
+- `rd_n` falls → first valid data (D0) 1 cycle later
+- `oe_n`/`rd_n` rise 1 cycle after `rxf_n` sampled HIGH (CD1→CD2 boundary)
+
+**Files modified:**
+- `mono/cocotb/ft601/driver.py` — Fixed `_tx_handler` to drive data on `OE_N` LOW instead of `RD_N` LOW
+- `hw/ip/usb/ft601/rtl/ft601_sync.sv` — Fixed RX timing diagram in comments (lines 14-30)
+- `docs/source/usb/ft601_phy.rst` — Fixed RX timing diagram and state descriptions
+- `docs/plans/ibex_soc_tasks.md` — Added work log entry
