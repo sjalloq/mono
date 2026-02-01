@@ -51,3 +51,9 @@ else
 fi
 
 source "$VENV_DIR/bin/activate"
+
+source /etc/modules/init/bash
+module use /opt/modulefiles
+module switch gcc/riscv/lowrisc-rv32imcb
+
+export PROJ_ROOT=`pwd`

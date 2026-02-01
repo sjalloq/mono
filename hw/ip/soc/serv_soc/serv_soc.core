@@ -1,0 +1,56 @@
+CAPI=2:
+name: mono:ip:serv_soc
+description: SERV RISC-V AON SoC with Wishbone bus
+
+filesets:
+  rtl:
+    depend:
+      - mono:ip:wb_pkg
+      - mono:ip:serv_wb
+      - mono:ip:wb_crossbar
+      - mono:ip:tcm
+      - mono:ip:timer
+      - mono:ip:sim_ctrl
+    files:
+      - rtl/serv_soc_pkg.sv
+      - rtl/serv_soc_top.sv
+    file_type: systemVerilogSource
+
+  verilator_waivers:
+    files:
+      - lint/verilator.vlt: {file_type: vlt}
+
+parameters:
+  TcmInitFile:
+    datatype: file
+    description: Hex file for TCM initialization (unified I+D memory)
+    paramtype: vlogparam
+
+targets:
+  default: &default
+    filesets:
+      - rtl
+      - "tool_verilator ? (verilator_waivers)"
+    parameters:
+      - TcmInitFile
+    toplevel: serv_soc_top
+
+  lint:
+    <<: *default
+    toplevel: serv_soc_top
+    default_tool: verilator
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+
+  sim:
+    <<: *default
+    toplevel: serv_soc_top
+    default_tool: verilator
+    tools:
+      verilator:
+        verilator_options:
+          - --trace
+          - --trace-fst

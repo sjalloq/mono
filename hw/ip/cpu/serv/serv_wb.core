@@ -1,0 +1,29 @@
+CAPI=2:
+name: mono:ip:serv_wb
+description: SERV RISC-V core with pipelined Wishbone interface
+
+filesets:
+  rtl:
+    depend:
+      - mono:ip:wb_pkg
+      - award-winning:serv:serv
+    files:
+      - rtl/serv_wb_top.sv
+    file_type: systemVerilogSource
+
+targets:
+  default: &default
+    filesets:
+      - rtl
+
+  lint:
+    <<: *default
+    default_tool: verilator
+    toplevel: serv_wb_top
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+          - -Wno-UNUSEDSIGNAL
+          - -Wno-WIDTHEXPAND

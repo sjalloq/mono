@@ -1,0 +1,101 @@
+CAPI=2:
+name: mono:projects:squirrel_serv_soc
+description: SERV RISC-V AON SoC for Squirrel/CaptainDMA board
+
+filesets:
+  rtl:
+    depend:
+      - mono:ip:mmcm
+      - mono:ip:serv_soc
+      - mono:ip:ft601
+      - mono:ip:usb_core
+      - mono:ip:usb_uart
+      - mono:ip:wb_pkg
+      - lowrisc:prim:fifo
+    files:
+      - rtl/usb_subsystem.sv
+      - rtl/core.sv
+      - rtl/squirrel_serv_top.sv
+    file_type: systemVerilogSource
+
+  board:
+    depend:
+      - mono:boards:squirrel
+
+  constraints:
+    depend:
+      - mono:utils:generators
+    files:
+      - pins.yaml: { copyto: pins.yaml }
+    file_type: user
+
+  verilator_waivers:
+    files:
+      - lint/verilator.vlt
+    file_type: vlt
+
+parameters:
+  TcmInitFile:
+    datatype: file
+    description: Hex file for TCM initialization (unified I+D memory)
+    paramtype: vlogparam
+
+generate:
+  xdc:
+    generator: xdc_generator
+    parameters:
+      board: squirrel
+      toplevel: rtl/squirrel_serv_top.sv
+      output: squirrel_serv.xdc
+
+targets:
+  default: &default
+    filesets: [rtl, board]
+    toplevel: squirrel_serv_top
+    parameters:
+      - TcmInitFile
+
+  synth: &synth
+    default_tool: vivado
+    filesets: [rtl, board, constraints]
+    generate: [xdc]
+    toplevel: squirrel_serv_top
+    parameters:
+      - TcmInitFile
+    tools:
+      vivado:
+        part: xc7a35tfgg484-2
+
+  impl:
+    <<: *synth
+    tools:
+      vivado:
+        part: xc7a35tfgg484-2
+        pnr: vivado
+
+  lint:
+    default_tool: verilator
+    filesets:
+      - rtl
+      - "tool_verilator ? (verilator_waivers)"
+    toplevel: squirrel_serv_top
+    tools:
+      verilator:
+        mode: lint-only
+        verilator_options:
+          - -Wall
+          - -Wno-MODMISSING
+
+  sim:
+    default_tool: verilator
+    filesets:
+      - rtl
+      - "tool_verilator ? (verilator_waivers)"
+    toplevel: squirrel_serv_top
+    parameters:
+      - TcmInitFile
+    tools:
+      verilator:
+        verilator_options:
+          - --trace
+          - --trace-fst

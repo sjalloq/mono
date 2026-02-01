@@ -15,6 +15,7 @@ docs/_build/
 build/
 *.eda.yml
 .flist
+*.f
 
 # Simulation
 *.vcd
@@ -50,3 +51,6 @@ results.xml
 *.elf
 *.map
 *.vmem
+
+# General
+*.log

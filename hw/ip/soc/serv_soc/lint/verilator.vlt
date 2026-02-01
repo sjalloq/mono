@@ -1,0 +1,42 @@
+// Lint waivers for serv_soc
+// Format: lint_off -rule <RULE> -file "<glob>" [-line <num>] [-match "<regex>"]
+
+`verilator_config
+
+// Wishbone crossbar: transpose pattern routes signals between decoder and
+// arbiters. No actual combinational loop - forward data path with stall-only
+// feedback. Verilator flags the array transpose structure conservatively.
+lint_off -rule UNOPTFLAT -file "*/wb_crossbar.sv"
+
+// Wishbone arbiter: priority encoder and stall handshaking are inherently
+// combinational. Standard arbiter design - no internal feedback loops.
+lint_off -rule UNOPTFLAT -file "*/wb_crossbar_arbiter.sv"
+
+// Unused struct fields: modules only use subset of wb_m2s_i fields.
+// TCM only uses address bits needed for its depth.
+lint_off -rule UNUSEDSIGNAL -file "*/wb_tcm.sv" -match "*wb_m2s_i*"
+
+// Timer only uses bits needed for register decode.
+lint_off -rule UNUSEDSIGNAL -file "*/wb_timer.sv" -match "*wb_m2s_i*"
+
+// SimCtrl only uses bits [3:2] of address for register decode,
+// only uses sel[0] and dat[7:0] for character output.
+lint_off -rule UNUSEDSIGNAL -file "*/wb_sim_ctrl.sv" -match "*wb_m2s_i*"
+
+// External slave input port is unused when NumExtSlaves==0 (the default).
+// The port exists for parent modules to connect external Wishbone slaves.
+lint_off -rule UNUSEDSIGNAL -file "*/serv_soc_top.sv" -match "Signal is not used: 'ext_wb_s2m_i'"
+
+// Unsigned loop comparisons against NumExtSlaves are constant when the
+// parameter defaults to 0. Expected for parameterized external slave support.
+lint_off -rule UNSIGNED -file "*/serv_soc_top.sv"
+
+// Package parameters used by software headers but not all hardware modules.
+// DataWidth, TimerBase, SimCtrlBase are defined for completeness.
+lint_off -rule UNUSEDPARAM -file "*/serv_soc_pkg.sv"
+
+// SERV internal signals: unused extension/MDU outputs already tied off
+// in serv_wb_top. SERV Verilog uses patterns that trigger width warnings.
+lint_off -rule UNUSEDSIGNAL -file "*/serv_wb_top.sv" -match "*unused*"
+lint_off -rule WIDTHEXPAND -file "*/serv_*.sv"
+lint_off -rule WIDTHEXPAND -file "*/serv_*.v"

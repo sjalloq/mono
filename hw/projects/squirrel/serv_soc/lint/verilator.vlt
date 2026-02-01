@@ -1,0 +1,92 @@
+// Lint waivers for squirrel_serv_soc
+// Format: lint_off -rule <RULE> -file "<glob>" [-line <num>] [-match "<regex>"]
+
+`verilator_config
+
+// =============================================================================
+// Xilinx primitive cascade waivers
+// =============================================================================
+// With -Wno-MODMISSING, Verilator black-boxes Xilinx primitives (BUFG, IOBUF,
+// MMCME2_BASE, SRL16E). This causes their outputs to appear undriven and their
+// inputs to appear unused. These waivers suppress the cascading false positives.
+
+// MMCM wrapper: all internal signals are driven by Xilinx primitives
+lint_off -rule UNDRIVEN      -file "*/mmcm.sv"
+lint_off -rule UNUSEDSIGNAL  -file "*/mmcm.sv"
+lint_off -rule UNUSEDPARAM   -file "*/mmcm.sv"
+
+// squirrel_serv_top: BUFG/SRL16E/IOBUF inputs appear unused, outputs undriven
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_serv_top.sv" -match "Signal is not used: 'clk100'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_serv_top.sv" -match "Signal is not used: 'usb_data_o'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_serv_top.sv" -match "Signal is not used: 'usb_data_oe'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_serv_top.sv" -match "Signal is not used: 'usb_be_o'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_serv_top.sv" -match "Signal is not used: 'usb_be_oe'"
+lint_off -rule UNDRIVEN     -file "*/squirrel_serv_top.sv" -match "Signal is not driven: 'clk100_buf'"
+lint_off -rule UNDRIVEN     -file "*/squirrel_serv_top.sv" -match "Signal is not driven: 'rst_por'"
+lint_off -rule UNDRIVEN     -file "*/squirrel_serv_top.sv" -match "Signal is not driven: 'usb_data_i'"
+lint_off -rule UNDRIVEN     -file "*/squirrel_serv_top.sv" -match "Signal is not driven: 'usb_be_i_unused'"
+
+// =============================================================================
+// squirrel_serv_top.sv waivers
+// =============================================================================
+
+// Unused MMCM outputs - only clk_sys (62.5 MHz) is currently used.
+// clk_125m and clk_250m reserved for USB/high-speed peripherals.
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_serv_top.sv" -match "Signal is not used: 'clk_125m'"
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_serv_top.sv" -match "Signal is not used: 'clk_250m'"
+
+// BE input from IOBUF is not used - FT601 BE is output-only in our design.
+lint_off -rule UNUSEDSIGNAL -file "*/squirrel_serv_top.sv" -match "Signal is not used: 'usb_be_i_unused'"
+
+// =============================================================================
+// usb_core.v waivers (Migen-generated code)
+// =============================================================================
+// These warnings come from the Migen-generated USB core Verilog and cannot be
+// fixed in the source. They are expected artifacts of the Migen code generator.
+
+lint_off -rule COMBDLY       -file "*/usb_core.v"
+lint_off -rule UNUSEDSIGNAL  -file "*/usb_core.v"
+lint_off -rule PROCASSINIT   -file "*/usb_core.v"
+lint_off -rule WIDTHTRUNC    -file "*/usb_core.v"
+lint_off -rule WIDTHEXPAND   -file "*/usb_core.v"
+lint_off -rule INITIALDLY    -file "*/usb_core.v"
+lint_off -rule CASEOVERLAP   -file "*/usb_core.v"
+lint_off -rule UNSIGNED      -file "*/usb_core.v"
+
+// =============================================================================
+// usb_subsystem.sv waivers
+// =============================================================================
+
+// phy_tx_first/last are outputs from usb_core that we don't need at the PHY
+// level (FT601 is a raw byte stream, no first/last framing).
+lint_off -rule PINCONNECTEMPTY -file "*/usb_subsystem.sv" -match "*phy_tx_first*"
+lint_off -rule PINCONNECTEMPTY -file "*/usb_subsystem.sv" -match "*phy_tx_last*"
+
+// Channel 1 is tied off (future Etherbone). All ch1 output signals are unused.
+lint_off -rule UNUSEDSIGNAL -file "*/usb_subsystem.sv" -match "Signal is not used: 'ch1_*'"
+
+// ch0 first/error signals from USB core are not used by USB UART.
+lint_off -rule UNUSEDSIGNAL -file "*/usb_subsystem.sv" -match "Signal is not used: 'ch0_rx_first'"
+lint_off -rule UNUSEDSIGNAL -file "*/usb_subsystem.sv" -match "Signal is not used: 'ch0_rx_error'"
+
+// =============================================================================
+// core.sv waivers
+// =============================================================================
+
+// user_sw[1] is directly connected to a top-level port but not yet used.
+// Reserved for future use; only user_sw[0] is currently used for LED test.
+lint_off -rule UNUSEDSIGNAL -file "*/core.sv" -match "Signal is not used: 'user_sw'"
+
+// USB UART IRQ is not yet connected to the CPU interrupt controller.
+// Will be wired when interrupt support is added.
+lint_off -rule UNUSEDSIGNAL -file "*/core.sv" -match "Signal is not used: 'uart_irq'"
+
+// CDC FIFO diagnostic outputs (wdepth_o, rdepth_o) and RX FIFO wready_o are
+// intentionally unconnected. wready_o is unused because FT601 RX has no
+// backpressure mechanism. Depth outputs are available for debug but not needed.
+lint_off -rule PINCONNECTEMPTY -file "*/core.sv" -match "*wready_o*"
+lint_off -rule PINCONNECTEMPTY -file "*/core.sv" -match "*wdepth_o*"
+lint_off -rule PINCONNECTEMPTY -file "*/core.sv" -match "*rdepth_o*"
+
+// Simulation control outputs are unused in the synthesis top-level.
+lint_off -rule PINCONNECTEMPTY -file "*/squirrel_serv_top.sv" -match "*sim_*"
