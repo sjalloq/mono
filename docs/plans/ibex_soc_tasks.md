@@ -749,6 +749,35 @@ Task 8 (SystemRDL) ─► Task 9 (Rust)
 
 ---
 
+### 2026-02-01: USB UART Module Refactoring
+
+**Work completed:**
+- Refactored `usb_uart` module hierarchy to separate FIFO storage from control logic
+- Created `usb_uart_csr.sv` — wraps `wb2simple` + `usb_uart_csr_reg_top` + IRQ generation, translates CSR register names to clean datapath names
+- Created `usb_uart_tx_ctrl.sv` — pure TX control logic (flush triggers, state machine, byte counting) with external FIFO interface
+- Created `usb_uart_rx_ctrl.sv` — pure RX control logic (packet tracking, CPU read controller) with external FIFO interfaces
+- Rewrote `usb_uart.sv` as composition layer instantiating: CSR wrapper, 3× `prim_fifo_sync`, TX ctrl, RX ctrl
+- Fixed naming confusion: `tx_invalidate` = discard TX FIFO, `rx_invalidate` = discard RX FIFO, `sw_flush` = send buffered TX data
+- Deleted `usb_uart_tx_fifo.sv` and `usb_uart_rx_fifo.sv` (replaced by ctrl + prim_fifo_sync)
+- Updated `usb_uart.core` with new filenames and `lowrisc:prim:fifo` dependency
+
+**Files created:**
+- `hw/ip/usb/uart/rtl/usb_uart_csr.sv` — CSR + bus adapter + IRQ wrapper
+- `hw/ip/usb/uart/rtl/usb_uart_tx_ctrl.sv` — TX flush/send control logic
+- `hw/ip/usb/uart/rtl/usb_uart_rx_ctrl.sv` — RX packet tracking control logic
+
+**Files modified:**
+- `hw/ip/usb/uart/rtl/usb_uart.sv` — Rewritten as composition layer with 3× prim_fifo_sync
+- `hw/ip/usb/uart/usb_uart.core` — Updated fileset and added lowrisc:prim:fifo dependency
+
+**Files deleted:**
+- `hw/ip/usb/uart/rtl/usb_uart_tx_fifo.sv` — Replaced by usb_uart_tx_ctrl.sv + prim_fifo_sync
+- `hw/ip/usb/uart/rtl/usb_uart_rx_fifo.sv` — Replaced by usb_uart_rx_ctrl.sv + 2× prim_fifo_sync
+
+**Lint status:** PASS (`mono:ip:usb_uart`)
+
+---
+
 ### 2026-02-01: Fix FT601 BFM `_tx_handler` and Timing Diagrams
 
 **Work completed:**

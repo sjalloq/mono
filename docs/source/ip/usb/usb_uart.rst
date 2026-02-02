@@ -23,26 +23,35 @@ The USB UART replaces traditional UART for CPU debug I/O:
 
 .. code-block:: text
 
-    ┌────────────────────────────────────────────────────────────────────────────┐
-    │                                 usb_uart                                   │
+    ┌───────────────────────────────────────────────────────────────────────────┐
+    │                                usb_uart                                    │
     │                                                                            │
-    │  Wishbone Slave                                   usb_channel_description  │
-    │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐                 │
-    │  │ wb2simple   │───►│ CSR Block   │    │    TX FIFO      │──► sink         │
-    │  │             │    │ (PeakRDL)   │───►│  + flush logic  │   .valid/ready  │
-    │  └─────────────┘    │             │    │  + byte count   │   .data[31:0]   │
-    │                     │             │    └─────────────────┘   .dst[7:0]     │
-    │                     │             │                          .length[31:0] |
-    │                     │             │                          .last         │
-    │                     │             │    ┌─────────────────┐                 │
-    │                     │             │◄───│   RX Data FIFO  │◄── source       │
-    │                     │             │    │   (32 words)    │   .valid/ready  │
-    │                     │             │    ├─────────────────┤   .data[31:0]   │
-    │                     │             │◄───│   RX Len FIFO   │   .length[31:0] |
-    │                     │             │    │   (4 entries)   │   .last         │
-    │                     └─────────────┘    └─────────────────┘                 │
-    │                                                                            │
-    └────────────────────────────────────────────────────────────────────────────┘
+    │  Wishbone Slave                                  usb_channel_description   │
+    │  ┌──────────────────────┐                                                  │
+    │  │    usb_uart_csr      │    ┌─────────────────┐                           │
+    │  │  (wb2simple +        │    │  prim_fifo_sync  │                           │
+    │  │   reg_top + IRQ)     │───►│  (TX Data FIFO)  │                           │
+    │  │                      │    └────────┬────────┘                           │
+    │  │                      │             │                                    │
+    │  │                      │    ┌────────▼────────┐                           │
+    │  │                      │    │ usb_uart_tx_ctrl │──► sink                  │
+    │  │                      │    │ (flush + send)   │   .valid/ready           │
+    │  │                      │    └─────────────────┘   .data, .dst, .length   │
+    │  │                      │                          .last                   │
+    │  │                      │    ┌─────────────────┐                           │
+    │  │                      │◄───│  prim_fifo_sync  │◄── source                │
+    │  │                      │    │  (RX Data FIFO)  │   .valid/ready           │
+    │  │                      │    └─────────────────┘   .data, .length         │
+    │  │                      │    ┌─────────────────┐   .last                   │
+    │  │                      │◄───│  prim_fifo_sync  │                           │
+    │  │                      │    │  (RX Len FIFO)   │                           │
+    │  │                      │    └────────▲────────┘                           │
+    │  │                      │             │                                    │
+    │  │                      │    ┌────────┴────────┐                           │
+    │  │                      │    │ usb_uart_rx_ctrl │                           │
+    │  └──────────────────────┘    │ (packet tracker) │                           │
+    │                              └─────────────────┘                           │
+    └───────────────────────────────────────────────────────────────────────────┘
 
 
 Register Map
@@ -115,17 +124,17 @@ Dual-FIFO Architecture
          │  .valid, .ready, .data[31:0], .length[31:0], .last
          ▼
     ┌─────────────────────────────────────────────────────────┐
-    │                  Packet Receiver FSM                    │
+    │                  usb_uart_rx_ctrl                       │
     │                                                         │
-    │  - Captures .length on first beat of each packet        │
-    │  - Writes payload words to Data FIFO                    │
-    │  - Pushes length to Len FIFO when .last seen            │
+    │  - Writes incoming data words to Data FIFO              │
+    │  - On accepted last beat, pushes rx_length_i to Len     │
+    │    FIFO directly (no internal packet state)             │
     └─────────────────┬─────────────────────┬─────────────────┘
                       │                     │
                       ▼                     ▼
               ┌──────────────┐      ┌──────────────┐
               │  Data FIFO   │      │  Len FIFO    │
-              │  (32 words)  │      │  (4 entries) │
+              │  (RX_DEPTH)  │      │  (LEN_DEPTH) │
               │              │      │              │
               │  32-bit data │      │  32-bit len  │
               └──────┬───────┘      └──────┬───────┘
@@ -147,15 +156,14 @@ Data Flow
 ~~~~~~~~~
 
 1. USB packet arrives on channel 2 via ``usb_channel_description`` stream
-2. Stream provides ``length`` (from packet header) on first beat
-3. Receiver FSM captures ``length``, writes data words to Data FIFO
-4. When ``last`` asserted, push captured length to Len FIFO
-5. ``RX_LEN`` now shows packet byte count; ``STATUS.rx_empty`` clears
-6. Interrupt fires if ``CTRL.rx_irq_en`` set
-7. CPU reads ``RX_LEN`` to learn packet size
-8. CPU reads ``ceil(RX_LEN / 4)`` words from ``RX_DATA``
-9. After final word read, hardware pops Len FIFO
-10. ``RX_LEN`` updates to next packet's length (or 0 if none)
+2. ``usb_uart_rx_ctrl`` writes each data word to Data FIFO as it arrives
+3. On the accepted last beat, ``rx_length_i`` is pushed directly to Len FIFO
+4. ``RX_LEN`` now shows packet byte count; ``status.rx_valid`` asserts
+5. Interrupt fires if ``irq_enable.rx_valid`` set
+6. CPU reads ``RX_LEN`` to learn packet size
+7. CPU reads ``ceil(RX_LEN / 4)`` words from ``RX_DATA``
+8. After final word read, hardware pops Len FIFO
+9. ``RX_LEN`` updates to next packet's length (or 0 if none)
 
 Packet Boundaries
 ~~~~~~~~~~~~~~~~~
@@ -357,10 +365,12 @@ RTL Structure
 
 The ``usb_uart`` module instantiates:
 
-1. **wb2simple** - Wishbone to simple bus adapter
-2. **usb_uart_csr_reg_top** - PeakRDL-generated CSR block
-3. **usb_uart_tx_fifo** - TX FIFO with multi-byte newline scan and flush logic
-4. **usb_uart_rx_fifo** - Dual-FIFO RX with packet boundary tracking
+1. **usb_uart_csr** — CSR wrapper (wb2simple + reg_top + IRQ generation)
+2. **prim_fifo_sync** — TX data FIFO (32-bit x TX_DEPTH)
+3. **usb_uart_tx_ctrl** — TX control (flush triggers, byte counting, state machine)
+4. **prim_fifo_sync** — RX data FIFO (32-bit x RX_DEPTH)
+5. **prim_fifo_sync** — RX length FIFO (32-bit x LEN_DEPTH)
+6. **usb_uart_rx_ctrl** — RX control (packet tracking, CPU read controller)
 
 .. code-block:: text
 
@@ -410,8 +420,9 @@ File                                        Description
 ``hw/ip/usb/uart/rdl/usb_uart_csr.rdl``     SystemRDL register definition
 ``hw/ip/usb/uart/rdl/Makefile``             PeakRDL generation
 ``hw/ip/usb/uart/rtl/usb_uart_csr_*.sv``    Generated CSR package and top
-``hw/ip/usb/uart/rtl/usb_uart_tx_fifo.sv``  TX FIFO with flush logic
-``hw/ip/usb/uart/rtl/usb_uart_rx_fifo.sv``  RX dual-FIFO with packet tracking
-``hw/ip/usb/uart/rtl/usb_uart.sv``          Top-level module
+``hw/ip/usb/uart/rtl/usb_uart_csr.sv``      CSR + bus adapter + IRQ wrapper
+``hw/ip/usb/uart/rtl/usb_uart_tx_ctrl.sv``  TX control logic (flush/send)
+``hw/ip/usb/uart/rtl/usb_uart_rx_ctrl.sv``  RX control logic (packet tracking)
+``hw/ip/usb/uart/rtl/usb_uart.sv``          Top-level composition module
 ``hw/ip/usb/uart/usb_uart.core``            FuseSoC core file
 ==========================================  ==========================================

@@ -7,13 +7,15 @@ filesets:
     files:
       - rtl/usb_uart_csr_reg_pkg.sv
       - rtl/usb_uart_csr_reg_top.sv
-      - rtl/usb_uart_tx_fifo.sv
-      - rtl/usb_uart_rx_fifo.sv
+      - rtl/usb_uart_csr.sv
+      - rtl/usb_uart_tx_ctrl.sv
+      - rtl/usb_uart_rx_ctrl.sv
       - rtl/usb_uart.sv
       - target_lint ? (lint/verilator.vlt): {file_type: vlt}
     file_type: systemVerilogSource
     depend:
       - mono:ip:csr
+      - lowrisc:prim:fifo
 
   dv:
     files:

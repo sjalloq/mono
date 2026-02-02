@@ -7,9 +7,9 @@ Mono
    :caption: Contents:
 
    repository
-   ibex_soc/index
-   serv_soc/index
-   usb/index
+   soc/index
+   ip/index
+   projects/index
    tools/index
 
 

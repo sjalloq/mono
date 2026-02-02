@@ -69,7 +69,7 @@ USB UART
 ========
 
 The USB UART register interface is shared with the Ibex SoC. See the
-:doc:`USB UART documentation </usb/usb_uart>` for the full register map.
+:doc:`USB UART documentation </ip/usb/usb_uart>` for the full register map.
 
 ========  ==================  ====  ==========================================
 Offset    Name                R/W   Description
