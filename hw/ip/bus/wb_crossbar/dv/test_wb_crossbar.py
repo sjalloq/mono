@@ -457,3 +457,30 @@ async def test_stress_random_with_backpressure(dut):
         assert False, f"{len(errors)} memory consistency errors (showing first 10)"
 
     dut._log.info("test_stress_random_with_backpressure PASSED")
+
+
+# --- pytest wrappers (collected by pytest, invoke simulator) ---
+
+def test_run_single_write_read(test_session):
+    test_session.run(test_filter="test_single_write_read")
+
+def test_run_slave_routing(test_session):
+    test_session.run(test_filter="test_slave_routing")
+
+def test_run_unmapped_address(test_session):
+    test_session.run(test_filter="test_unmapped_address")
+
+def test_run_two_masters(test_session):
+    test_session.run(test_filter="test_two_masters")
+
+def test_run_sequential_accesses(test_session):
+    test_session.run(test_filter="test_sequential_accesses")
+
+def test_run_byte_enables(test_session):
+    test_session.run(test_filter="test_byte_enables")
+
+def test_run_pipelined_writes(test_session):
+    test_session.run(test_filter="test_pipelined_writes")
+
+def test_run_stress_random_with_backpressure(test_session):
+    test_session.run(test_filter="test_stress_random_with_backpressure")

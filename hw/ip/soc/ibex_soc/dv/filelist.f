@@ -22,13 +22,14 @@
 /home/sjalloq/Work/mono/third_party/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_ram_1p_pkg.sv
 /home/sjalloq/Work/mono/third_party/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_ram_2p_pkg.sv
 /home/sjalloq/Work/mono/third_party/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_rom_pkg.sv
+/home/sjalloq/Work/mono/hw/ip/bus/wb_pkg/rtl/wb_pkg.sv
 /home/sjalloq/Work/mono/hw/ip/sim/sim_ctrl/rtl/wb_sim_ctrl.sv
+/home/sjalloq/Work/mono/hw/ip/mem/tcm/rtl/wb_tcm.sv
 /home/sjalloq/Work/mono/hw/ip/timer/rtl/wb_timer.sv
 /home/sjalloq/Work/mono/hw/ip/bus/wb_crossbar/rtl/wb_crossbar_pkg.sv
 /home/sjalloq/Work/mono/hw/ip/bus/wb_crossbar/rtl/wb_crossbar_decoder.sv
 /home/sjalloq/Work/mono/hw/ip/bus/wb_crossbar/rtl/wb_crossbar_arbiter.sv
 /home/sjalloq/Work/mono/hw/ip/bus/wb_crossbar/rtl/wb_crossbar.sv
-/home/sjalloq/Work/mono/hw/ip/mem/tcm/rtl/wb_tcm.sv
 /home/sjalloq/Work/mono/third_party/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_cipher_pkg.sv
 /home/sjalloq/Work/mono/third_party/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_and2.sv
 /home/sjalloq/Work/mono/third_party/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_buf.sv

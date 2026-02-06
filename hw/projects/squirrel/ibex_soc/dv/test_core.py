@@ -281,3 +281,10 @@ async def test_boot_heartbeat(dut):
     dut._log.info("PASS: CPU booted and produced output")
 
 
+# --- pytest wrappers (collected by pytest, invoke simulator) ---
+
+from conftest import FirmwareBuild, FIRMWARE_ROOT
+
+def test_run_boot_heartbeat(test_session):
+    FirmwareBuild("hello", FIRMWARE_ROOT / "hello").build_into(test_session.directory)
+    test_session.run(testcase="test_boot_heartbeat")

@@ -17,6 +17,7 @@ VERILOG_SOURCES =
 # Simulator
 SIM = verilator
 EXTRA_ARGS += --trace --trace-fst -f $(FILELIST) -GItcmInitFile=\"hello.vmem\"
+EXTRA_ARGS += -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC -Wno-UNOPTFLAT
 
 # Verilator-specific
 VERILATOR_FLAGS = -Wno-fatal

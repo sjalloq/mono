@@ -285,3 +285,20 @@ async def test_usb_uart_loopback(dut):
 
     tb.check_no_cpu_errors()
     dut._log.info("PASS: USB UART loopback with multiple packet sizes verified")
+
+
+# --- pytest wrappers (collected by pytest, invoke simulator) ---
+
+from conftest import FirmwareBuild, FIRMWARE_ROOT
+
+def test_run_usb_uart_tx(test_session):
+    FirmwareBuild("usb_echo", FIRMWARE_ROOT / "usb_echo").build_into(test_session.directory)
+    test_session.run(testcase="test_usb_uart_tx")
+
+def test_run_usb_uart_rx(test_session):
+    FirmwareBuild("usb_echo", FIRMWARE_ROOT / "usb_echo").build_into(test_session.directory)
+    test_session.run(testcase="test_usb_uart_rx")
+
+def test_run_usb_uart_loopback(test_session):
+    FirmwareBuild("usb_echo", FIRMWARE_ROOT / "usb_echo").build_into(test_session.directory)
+    test_session.run(testcase="test_usb_uart_loopback")

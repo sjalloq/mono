@@ -11,6 +11,7 @@ dependencies = [
     "liteeth @ git+https://github.com/enjoy-digital/liteeth.git@2025.12",
     "litepcie @ git+https://github.com/sjalloq/litepcie.git@feature/tlp-attributes",
     "peakrdl-sv @ git+https://github.com/sjalloq/peakrdl-sv@0.1.0",
+    "pytest-cocotb @ git+https://github.com/sjalloq/pytest-cocotb",
     "rich-click>=1.7",
     "pre-commit",
     "cocotb>=2.0",
