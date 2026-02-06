@@ -11,6 +11,7 @@ Mono
    ip/index
    projects/index
    tools/index
+   pytest/index
 
 
 Indices and tables
